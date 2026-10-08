@@ -1,0 +1,74 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: resume_reviewer_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-resume_reviewer}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d resume_reviewer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - resume_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: resume_reviewer_backend
+    restart: unless-stopped
+    environment:
+      APP_NAME: ai-resume-reviewer-api
+      APP_ENV: development
+      DEBUG: "true"
+      HOST: 0.0.0.0
+      PORT: "8000"
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-resume_reviewer}
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000,http://localhost,http://127.0.0.1:5173,http://127.0.0.1:3000
+      GEMINI_MODEL: gemini-3.8-flash
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - resume_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: resume_reviewer_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - resume_network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  resume_network:
+    driver: bridge

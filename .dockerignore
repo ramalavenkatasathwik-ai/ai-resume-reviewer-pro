@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv
+venv
+ENV
+env
+.pytest_cache
+.coverage
+coverage
+htmlcov
+
+# Node / Frontend
+node_modules
+dist
+dist-ssr
+npm-debug.log*
+
+# Docs & IDE
+docs
+.vscode
+.idea
+.DS_Store
+Thumbs.db
