@@ -1,9 +1,13 @@
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
+from sqlalchemy.orm import Session
 
 from app.core.security import get_gemini_api_key, limiter
+from app.core.logging import logger
+from app.database.database import get_db
 from app.schemas.analysis import AnalysisResult
+from app.services.analysis_history_service import AnalysisHistoryService
 from app.services.gemini_service import GeminiService
 from app.services.resume_service import ResumeService
 
@@ -24,6 +28,7 @@ async def analyze_resume(
     target_role: str = Form(..., description="Target job title / role for benchmark analysis"),
     model: Optional[str] = Form(None, description="Optional chosen Gemini model from supported allowlist"),
     api_key: str = Depends(get_gemini_api_key),
+    db: Session = Depends(get_db),
 ) -> AnalysisResult:
     """Validates the PDF, extracts content in-memory, and evaluates it using Google Gemini."""
     # 1. Validate PDF and extract text in-memory
@@ -37,4 +42,53 @@ async def analyze_resume(
         model_name=model,
     )
 
+    # 3. Record analysis to database
+    try:
+        AnalysisHistoryService.record_analysis(
+            db=db,
+            filename=file.filename or "resume.pdf",
+            target_role=target_role,
+            status="completed",
+            analysis_type="resume",
+            overall_score=analysis_result.overall_score,
+            ats_score=analysis_result.ats_score,
+            result_json=analysis_result.model_dump(),
+        )
+    except Exception as e:
+        logger.warning("Failed to record resume analysis to DB: %s", type(e).__name__)
+
     return analysis_result
+
+
+@router.get(
+    "/history",
+    summary="List Analysis History Records",
+    description="Retrieves past resume and LinkedIn analysis records from the database.",
+)
+async def list_history(
+    limit: int = 20,
+    offset: int = 0,
+    analysis_type: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """Lists history records ordered by creation date descending."""
+    records = AnalysisHistoryService.list_records(
+        db=db,
+        limit=limit,
+        offset=offset,
+        analysis_type=analysis_type,
+    )
+    return [
+        {
+            "id": r.id,
+            "filename": r.original_filename,
+            "target_role": r.target_role,
+            "status": r.status,
+            "analysis_type": getattr(r, "analysis_type", "resume"),
+            "overall_score": r.overall_score,
+            "ats_score": r.ats_score,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in records
+    ]
+

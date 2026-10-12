@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 export const CustomCursor: React.FC = () => {
   const [position, setPosition] = useState({ x: -100, y: -100 });
   const [isInteractive, setIsInteractive] = useState(false);
+  const [isButton, setIsButton] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -25,13 +26,14 @@ export const CustomCursor: React.FC = () => {
     const onMouseMove = (e: MouseEvent) => {
       setPosition({ x: e.clientX, y: e.clientY });
 
-      // Check if target or any ancestor is interactive
       const target = e.target as HTMLElement | null;
       if (target) {
-        const interactive = Boolean(
-          target.closest('button, a, input, select, textarea, [role="button"], [data-cursor-interactive]')
+        const buttonEl = target.closest('button, [role="button"], a');
+        const interactiveEl = target.closest(
+          'button, a, input, select, textarea, [role="button"], [data-cursor-interactive], .interactive-card'
         );
-        setIsInteractive(interactive);
+        setIsButton(Boolean(buttonEl));
+        setIsInteractive(Boolean(interactiveEl));
       }
     };
 
@@ -45,7 +47,7 @@ export const CustomCursor: React.FC = () => {
 
   return (
     <>
-      {/* Small orange center dot */}
+      {/* Center Orange Dot */}
       <div
         className="fixed top-0 left-0 w-2 h-2 rounded-full bg-[#FF7417] pointer-events-none z-[9999] -translate-x-1/2 -translate-y-1/2 transition-transform duration-75 ease-out shadow-[0_0_8px_#FF7417]"
         style={{
@@ -54,12 +56,14 @@ export const CustomCursor: React.FC = () => {
         aria-hidden="true"
       />
 
-      {/* Red/Orange outer ring with scale effect on interactive elements */}
+      {/* Red-Orange Outer Ring */}
       <div
         className={`fixed top-0 left-0 rounded-full pointer-events-none z-[9998] -translate-x-1/2 -translate-y-1/2 transition-all duration-150 ease-out ${
-          isInteractive
-            ? 'w-10 h-10 border-2 border-[#F04452] bg-[#FF7417]/10 scale-110 shadow-[0_0_12px_rgba(240,68,82,0.4)]'
-            : 'w-7 h-7 border border-[#FF7417]/50 scale-100'
+          isButton
+            ? 'w-10 h-10 border-2 border-[#C91432] bg-[#FF7417]/10 scale-125 shadow-[0_0_14px_rgba(201,20,50,0.45)]'
+            : isInteractive
+            ? 'w-9 h-9 border border-[#FF7417] bg-[#FF7417]/5 scale-110'
+            : 'w-7 h-7 border border-[#FF7417]/40 scale-100'
         }`}
         style={{
           transform: `translate3d(${position.x}px, ${position.y}px, 0) translate(-50%, -50%)`,

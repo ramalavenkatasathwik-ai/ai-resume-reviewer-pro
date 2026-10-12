@@ -1,120 +1,224 @@
-import React, { useState } from 'react';
-import { KeyRound, ShieldAlert, Check, Server, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  ShieldCheck,
+  Check,
+  Server,
+  Trash2,
+  ExternalLink,
+  Sliders,
+} from 'lucide-react';
+import { ApiKeyInput } from '@/components/ui/ApiKeyInput';
+import { ModelSelector } from '@/components/ui/ModelSelector';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { SecondaryButton } from '@/components/ui/SecondaryButton';
+import { Toast } from '@/components/ui/Toast';
+import { linkedinService } from '@/services/linkedinService';
 
 export const SettingsPage: React.FC = () => {
-  const [apiKey, setApiKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gemini-3.8-flash');
-  const [savedNotification, setSavedNotification] = useState(false);
+  const [apiKey, setApiKey] = useState<string>(() => {
+    try {
+      return localStorage.getItem('gemini_api_key') || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    try {
+      return localStorage.getItem('gemini_model') || 'gemini-2.5-flash';
+    } catch {
+      return 'gemini-2.5-flash';
+    }
+  });
+
+  const [availableModels, setAvailableModels] = useState<string[]>([
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+  ]);
+
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    linkedinService
+      .getSupportedModels()
+      .then((res) => {
+        if (res.models && res.models.length > 0) {
+          setAvailableModels(res.models);
+          if (!selectedModel) {
+            setSelectedModel(res.default_model || res.models[0]);
+          }
+        }
+      })
+      .catch(() => {
+        // Fallback default models already set
+      });
+  }, []);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    // BYOK: Key is only stored locally in user's browser, never sent to server until analysis request
-    if (apiKey.trim()) {
-      sessionStorage.setItem('byok_gemini_api_key', apiKey.trim());
+    try {
+      localStorage.setItem('gemini_api_key', apiKey.trim());
+      localStorage.setItem('gemini_model', selectedModel);
+      setToastMessage('Preferences and BYOK settings saved locally!');
+    } catch {
+      setToastMessage('Failed to write settings to local storage.');
     }
-    setSavedNotification(true);
-    setTimeout(() => setSavedNotification(false), 3000);
+  };
+
+  const handleClear = () => {
+    try {
+      localStorage.removeItem('gemini_api_key');
+      localStorage.removeItem('gemini_model');
+      setApiKey('');
+      setSelectedModel('gemini-2.5-flash');
+      setToastMessage('Cleared all locally cached keys and preferences.');
+    } catch {
+      // ignore
+    }
   };
 
   return (
-    <div className="space-y-8 py-8 max-w-4xl mx-auto px-4 sm:px-6">
-      <div className="pb-6 border-b border-slate-200">
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+    <div className="space-y-8 pb-16 max-w-4xl mx-auto">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type="success"
+          onClose={() => setToastMessage(null)}
+        />
+      )}
+
+      {/* Page Header */}
+      <div className="pb-6 border-b border-[#303038]">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#1C1C23] text-[#FF9B45] border border-[#303038] uppercase font-mono">
+            Configuration Hub
+          </span>
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-[#F7F7FA] tracking-tight">
           Application & BYOK Settings
         </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Configure client-side parameters and review system connection details.
+        <p className="text-sm text-[#A1A1AA] mt-1">
+          Configure client-side Google Gemini credentials, default model preferences, and view environment diagnostics.
         </p>
       </div>
 
-      {/* BYOK Security Notice */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-4">
-        <ShieldAlert className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-        <div className="text-xs text-amber-800 space-y-1">
-          <p className="font-bold">Zero-Storage BYOK (Bring Your Own Key) Security</p>
-          <p>
-            Your Google Gemini API key will never be hardcoded, logged, or saved into the repository or server databases. It operates purely as a client-provided credential during analysis sessions.
+      {/* BYOK Security Privacy Guarantee */}
+      <div className="p-5 rounded-2xl bg-[#141419] border border-[#FF7417]/30 flex items-start gap-4">
+        <div className="p-2 rounded-xl bg-[#FF7417]/15 text-[#FF7417] shrink-0">
+          <ShieldCheck className="w-5 h-5" />
+        </div>
+        <div className="text-xs text-[#A1A1AA] space-y-1">
+          <p className="font-bold text-[#F7F7FA] text-sm">
+            Zero-Storage BYOK (Bring Your Own Key) Security
+          </p>
+          <p className="leading-relaxed">
+            Your Google Gemini API key is stored only in your personal browser's local storage and passed via request headers (<code className="text-[#FF7417] font-mono">X-Gemini-API-Key</code>). It is never saved into database tables or log files on our servers.
           </p>
         </div>
       </div>
 
-      {/* Settings Form */}
-      <form onSubmit={handleSave} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
-        <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-            Target Gemini Model
-          </label>
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            <option value="gemini-3.8-flash">Gemini 3.8 Flash (Recommended - Ultra Fast)</option>
-            <option value="gemini-1.5-pro">Gemini 1.5 Pro (Deep Reasoning)</option>
-            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-          </select>
+      {/* Main Settings Form */}
+      <form
+        onSubmit={handleSave}
+        className="p-6 sm:p-8 rounded-2xl bg-[#141419] border border-[#303038] space-y-6 shadow-xl"
+      >
+        <div className="flex items-center gap-2 text-base font-bold text-[#F7F7FA] pb-2 border-b border-[#303038]">
+          <Sliders className="w-4 h-4 text-[#FF7417]" />
+          <span>Gemini AI Engine Parameters</span>
         </div>
 
+        {/* API Key Input with Live Validate Probe */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-            Client-Side Gemini API Key (BYOK)
+          <label className="block text-xs font-bold uppercase tracking-wider text-[#F7F7FA] mb-2">
+            Google Gemini API Key
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-              <KeyRound className="w-4 h-4" />
-            </div>
-            <input
-              type={showKey ? 'text' : 'password'}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="Paste your Gemini API key (active in Phase 2)"
-              className="w-full pl-10 pr-12 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
-            />
-            <button
-              type="button"
-              onClick={() => setShowKey(!showKey)}
-              className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none"
-            >
-              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          <p className="text-[11px] text-slate-400 mt-2">
-            API calls to Gemini are disabled during Phase 1 foundation verification.
+          <ApiKeyInput
+            value={apiKey}
+            onChange={setApiKey}
+            selectedModel={selectedModel}
+          />
+        </div>
+
+        {/* Model Selector */}
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-[#F7F7FA] mb-2">
+            Default Evaluation Model
+          </label>
+          <ModelSelector
+            models={availableModels}
+            selectedModel={selectedModel}
+            onChange={setSelectedModel}
+          />
+          <p className="text-[11px] text-[#A1A1AA] mt-2">
+            <span className="text-[#FF7417] font-semibold">gemini-2.5-flash</span> is recommended for low-latency ATS evaluation. <span className="text-[#FF7417] font-semibold">gemini-1.5-pro</span> provides extended reasoning depth.
           </p>
         </div>
 
-        <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
-          <button
-            type="submit"
-            className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold text-xs hover:bg-indigo-700 transition-colors shadow-sm"
-          >
-            Save Client Preferences
-          </button>
+        {/* Action Buttons */}
+        <div className="pt-4 border-t border-[#303038] flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <PrimaryButton variant="crimson" type="submit">
+              <Check className="w-4 h-4" />
+              <span>Save Preferences</span>
+            </PrimaryButton>
+            <SecondaryButton
+              type="button"
+              onClick={handleClear}
+              className="text-[#F04452] hover:border-[#C91432]"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Clear Cached Key</span>
+            </SecondaryButton>
+          </div>
 
-          {savedNotification && (
-            <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1.5 animate-fade-in">
-              <Check className="w-4 h-4" /> Preferences Stored Locally
-            </span>
-          )}
+          <a
+            href="https://aistudio.google.com/app/apikey"
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-[#FF7417] hover:underline flex items-center gap-1 font-semibold"
+          >
+            <span>Get Free Gemini Key</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
       </form>
 
       {/* Backend Environment Diagnostics */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <div className="flex items-center gap-2 pb-4 border-b border-slate-100">
-          <Server className="w-4 h-4 text-slate-600" />
-          <h3 className="text-sm font-bold text-slate-800">Environment Details</h3>
+      <div className="p-6 rounded-2xl bg-[#141419] border border-[#303038] space-y-4">
+        <div className="flex items-center gap-2 pb-3 border-b border-[#303038] text-sm font-bold text-[#F7F7FA]">
+          <Server className="w-4 h-4 text-[#FF7417]" />
+          <span>System Environment Diagnostics</span>
         </div>
-        <dl className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div>
-            <dt className="text-slate-400 font-medium">Frontend Base URL</dt>
-            <dd className="font-mono text-slate-700 mt-1">{window.location.origin}</dd>
+
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div className="p-4 rounded-xl bg-[#0B0B0E] border border-[#303038]">
+            <dt className="text-[#A1A1AA] font-semibold">Frontend Origin</dt>
+            <dd className="font-mono text-[#F7F7FA] mt-1 break-all">
+              {window.location.origin}
+            </dd>
           </div>
-          <div>
-            <dt className="text-slate-400 font-medium">Configured Backend URL</dt>
-            <dd className="font-mono text-slate-700 mt-1">
-              {import.meta.env.VITE_API_URL || '(Proxy to :8000 via /api)'}
+
+          <div className="p-4 rounded-xl bg-[#0B0B0E] border border-[#303038]">
+            <dt className="text-[#A1A1AA] font-semibold">Backend Target Endpoint</dt>
+            <dd className="font-mono text-[#F7F7FA] mt-1 break-all">
+              {import.meta.env.VITE_API_URL || '(Proxy to backend via /api)'}
+            </dd>
+          </div>
+
+          <div className="p-4 rounded-xl bg-[#0B0B0E] border border-[#303038]">
+            <dt className="text-[#A1A1AA] font-semibold">Architecture</dt>
+            <dd className="font-mono text-[#FF9B45] mt-1">
+              FastAPI + React 18 + PostgreSQL + BYOK Gemini
+            </dd>
+          </div>
+
+          <div className="p-4 rounded-xl bg-[#0B0B0E] border border-[#303038]">
+            <dt className="text-[#A1A1AA] font-semibold">Release Version</dt>
+            <dd className="font-mono text-emerald-400 mt-1">
+              v2.1.0-production
             </dd>
           </div>
         </dl>

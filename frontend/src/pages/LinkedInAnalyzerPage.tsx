@@ -47,7 +47,13 @@ export const LinkedInAnalyzerPage: React.FC = () => {
   const [targetRole, setTargetRole] = useState('AI Developer');
   const [customRoleInput, setCustomRoleInput] = useState('');
   const [isCustomRole, setIsCustomRole] = useState(false);
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState(() => {
+    try {
+      return localStorage.getItem('gemini_api_key') || '';
+    } catch {
+      return '';
+    }
+  });
   const [showApiKey, setShowApiKey] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
   const [availableModels, setAvailableModels] = useState<string[]>([

@@ -19,10 +19,10 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     <div
       className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
         status === 'connected'
-          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+          ? 'bg-[#141419] text-emerald-400 border-emerald-900/50'
           : status === 'offline'
-          ? 'bg-rose-50 text-rose-700 border-rose-200'
-          : 'bg-amber-50 text-amber-700 border-amber-200'
+          ? 'bg-[#141419] text-[#F04452] border-[#C91432]/40'
+          : 'bg-[#141419] text-amber-400 border-amber-900/40'
       } ${className}`}
       data-testid="status-badge"
     >
@@ -35,7 +35,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
             status === 'connected'
               ? 'bg-emerald-500'
               : status === 'offline'
-              ? 'bg-rose-500'
+              ? 'bg-[#C91432]'
               : 'bg-amber-500'
           }`}
         ></span>
@@ -50,7 +50,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       </span>
 
       {serviceName && status === 'connected' && (
-        <span className="hidden sm:inline text-emerald-600/70 border-l border-emerald-300 pl-2">
+        <span className="hidden sm:inline text-emerald-400/70 border-l border-[#303038] pl-2 font-mono text-[11px]">
           {serviceName}
         </span>
       )}

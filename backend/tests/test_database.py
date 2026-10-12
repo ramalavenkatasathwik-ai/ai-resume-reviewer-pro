@@ -67,3 +67,23 @@ def test_score_check_constraints(test_db_session: Session) -> None:
     with pytest.raises(IntegrityError):
         test_db_session.commit()
     test_db_session.rollback()
+
+
+def test_list_history_endpoint(client, test_db_session: Session) -> None:
+    """Verify GET /api/history returns recorded items."""
+    AnalysisHistoryService.record_analysis(
+        db=test_db_session,
+        filename="test_candidate.pdf",
+        target_role="AI Engineer",
+        status="completed",
+        analysis_type="resume",
+        overall_score=91,
+    )
+    response = client.get("/api/history")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) >= 1
+    assert data[0]["target_role"] == "AI Engineer"
+    assert data[0]["overall_score"] == 91
+
