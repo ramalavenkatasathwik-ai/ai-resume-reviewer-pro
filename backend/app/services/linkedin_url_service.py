@@ -18,7 +18,7 @@ class LinkedInUrlService:
       it honestly detects the limitation and guides the user to the official PDF export or text paste.
     """
 
-    SUPPORTED_LINKEDIN_DOMAINS = {
+    APPROVED_HOSTNAMES = {
         "linkedin.com",
         "www.linkedin.com",
         "in.linkedin.com",
@@ -30,12 +30,19 @@ class LinkedInUrlService:
         "es.linkedin.com",
         "nl.linkedin.com",
     }
-
-    PROFILE_PATH_PATTERN = re.compile(r"^/in/([a-zA-Z0-9_\-\.]+)/?$", re.IGNORECASE)
+    APPROVED_HOST_REGEX = re.compile(r"^(?:www\.|[a-z]{2}\.)?linkedin\.com$", re.IGNORECASE)
+    PROFILE_PATH_PATTERN = re.compile(r"^/in/([a-zA-Z0-9_\-\.%]+)/?$", re.IGNORECASE)
 
     @classmethod
     def validate_and_normalize_url(cls, raw_url: str) -> Tuple[str, str]:
         """Validates that a URL is a legitimate personal LinkedIn profile and normalizes it.
+        
+        Security & Ethical Compliance:
+        - Accepts only HTTPS LinkedIn profile URLs on approved LinkedIn hostnames.
+        - Validates the profile path (/in/<username>).
+        - Rejects unrelated domains, malformed URLs, credentials embedded in URLs, and unexpected ports.
+        - Normalizes supported URL forms to https://www.linkedin.com/in/<username>.
+        - Never treats URL validation as proof of profile access.
         
         Returns:
             Tuple of (normalized_url: str, username_slug: str)
@@ -43,7 +50,7 @@ class LinkedInUrlService:
         Raises:
             HTTPException with user-friendly errors on invalid or unauthorized URLs.
         """
-        if not raw_url or not isinstance(raw_url, str):
+        if not raw_url or not isinstance(raw_url, str) or not raw_url.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
@@ -53,8 +60,26 @@ class LinkedInUrlService:
             )
 
         cleaned_url = raw_url.strip()
-        if not cleaned_url.startswith(("http://", "https://")):
-            cleaned_url = f"https://{cleaned_url}"
+
+        # Reject insecure HTTP
+        if cleaned_url.startswith("http://"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "INSECURE_SCHEME",
+                    "message": "Insecure HTTP is not allowed. Only HTTPS LinkedIn profile URLs are supported.",
+                },
+            )
+
+        # Require HTTPS scheme
+        if not cleaned_url.startswith("https://"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "INVALID_URL_SCHEME",
+                    "message": "Only HTTPS LinkedIn profile URLs are supported.",
+                },
+            )
 
         try:
             parsed = urlparse(cleaned_url)
@@ -64,6 +89,26 @@ class LinkedInUrlService:
                 detail={
                     "error": "MALFORMED_URL",
                     "message": "The provided URL format is malformed or invalid.",
+                },
+            )
+
+        # Reject embedded credentials
+        if parsed.username or parsed.password or "@" in (parsed.netloc or ""):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "CREDENTIALS_NOT_ALLOWED",
+                    "message": "URLs containing embedded authentication credentials are not permitted.",
+                },
+            )
+
+        # Reject unexpected ports
+        if parsed.port is not None and parsed.port != 443:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "UNEXPECTED_PORT",
+                    "message": f"Unexpected port '{parsed.port}' specified in URL. Only standard HTTPS port 443 is permitted.",
                 },
             )
 
@@ -77,26 +122,25 @@ class LinkedInUrlService:
                 },
             )
 
-        # Domain verification: must end in linkedin.com or match allowed subdomains
-        if not (hostname == "linkedin.com" or hostname.endswith(".linkedin.com")):
+        # Verify approved LinkedIn hostname
+        if not cls.APPROVED_HOST_REGEX.match(hostname):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "error": "UNSUPPORTED_DOMAIN",
-                    "message": f"Domain '{hostname}' is not supported. Only official LinkedIn personal profile URLs are accepted.",
+                    "message": f"Domain '{hostname}' is not supported. Only approved LinkedIn personal profile URLs are accepted.",
                 },
             )
 
         path = parsed.path
         match = cls.PROFILE_PATH_PATTERN.match(path)
-        if not match:
-            # Check if it was a non-personal profile path like /jobs or /company
+        if not match or not match.group(1):
             if path.startswith("/company"):
                 msg = "Company pages are not supported. Please supply a personal LinkedIn member profile (e.g. /in/username)."
             elif path.startswith("/jobs"):
                 msg = "Job posting URLs are not supported. Please supply a personal LinkedIn member profile."
-            elif path.startswith(("/feed", "/posts", "/learning")):
-                msg = "Only individual LinkedIn personal profile URLs (/in/...) are accepted."
+            elif path.startswith(("/feed", "/posts", "/learning", "/school", "/groups")):
+                msg = f"Path '{path}' is not a personal profile path. Only personal LinkedIn member profiles (/in/...) are accepted."
             else:
                 msg = "URL path must point to a personal LinkedIn profile (e.g. https://www.linkedin.com/in/username)."
 
@@ -108,7 +152,7 @@ class LinkedInUrlService:
                 },
             )
 
-        username = match.group(1)
+        username = match.group(1).rstrip("/")
         normalized_url = f"https://www.linkedin.com/in/{username}"
         return normalized_url, username
 

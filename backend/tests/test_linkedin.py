@@ -9,6 +9,12 @@ from google.genai import errors as genai_errors
 
 from app.services.linkedin_url_service import LinkedInUrlService
 from app.services.linkedin_service import LinkedInService
+from app.services.linkedin_profile_provider import (
+    LinkedInProfileAcquisitionService,
+    OfficialLinkedInApiProvider,
+    FallbackTextProvider,
+    ProfileAcquisitionResult,
+)
 from app.models.analysis import AnalysisHistory
 
 MOCK_API_KEY = "AIzaSyFakeValidKey1234567890abcdefghijkl"
@@ -250,13 +256,13 @@ MOCK_LINKEDIN_LLM_JSON = json.dumps({
 # ---------------------------------------------------------------------------
 
 def test_validate_linkedin_url_success():
-    """Verifies that valid LinkedIn profile URLs are normalized."""
+    """Verifies that valid HTTPS LinkedIn profile URLs are normalized."""
     valid_urls = [
         "https://www.linkedin.com/in/janedoe/",
-        "http://linkedin.com/in/john-doe-123",
-        "www.linkedin.com/in/alex_smith",
-        "in.linkedin.com/in/candidate.profile",
+        "https://linkedin.com/in/john-doe-123",
+        "https://in.linkedin.com/in/candidate.profile",
         "https://uk.linkedin.com/in/engineer-pro/",
+        "https://www.linkedin.com/in/alex-smith-123?trk=public_profile#about",
     ]
     for url in valid_urls:
         norm, slug = LinkedInUrlService.validate_and_normalize_url(url)
@@ -264,19 +270,80 @@ def test_validate_linkedin_url_success():
         assert slug
 
 
+def test_validate_linkedin_url_insecure_http_rejected():
+    """Verifies that insecure HTTP URLs are rejected with status 400."""
+    insecure_urls = [
+        "http://linkedin.com/in/john-doe-123",
+        "http://www.linkedin.com/in/janedoe",
+        "http://in.linkedin.com/in/profile",
+    ]
+    for url in insecure_urls:
+        with pytest.raises(HTTPException) as exc_info:
+            LinkedInUrlService.validate_and_normalize_url(url)
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail["error"] == "INSECURE_SCHEME"
+
+
+def test_validate_linkedin_url_malformed():
+    """Verifies that empty, non-HTTPS, or malformed URLs are rejected."""
+    malformed_urls = [
+        "",
+        "   ",
+        "not a valid url",
+        "ftp://linkedin.com/in/janedoe",
+        "javascript:alert(1)",
+    ]
+    for url in malformed_urls:
+        with pytest.raises(HTTPException) as exc_info:
+            LinkedInUrlService.validate_and_normalize_url(url)
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail["error"] in ("EMPTY_URL", "INVALID_URL_SCHEME", "MALFORMED_URL")
+
+
 def test_validate_linkedin_url_unsupported_domains():
-    """Verifies rejection of non-LinkedIn domains."""
+    """Verifies rejection of non-approved and spoofed LinkedIn domains."""
     invalid_domains = [
         "https://github.com/in/username",
         "https://facebook.com/in/username",
         "https://twitter.com/in/username",
         "https://myportfolio.com/in/username",
+        "https://evil-linkedin.com/in/username",
+        "https://linkedin.com.attacker.com/in/username",
+        "https://fakelinkedin.net/in/username",
     ]
     for url in invalid_domains:
         with pytest.raises(HTTPException) as exc_info:
             LinkedInUrlService.validate_and_normalize_url(url)
         assert exc_info.value.status_code == 400
         assert exc_info.value.detail["error"] == "UNSUPPORTED_DOMAIN"
+
+
+def test_validate_linkedin_url_embedded_credentials_rejected():
+    """Verifies that URLs with embedded credentials are strictly rejected."""
+    credential_urls = [
+        "https://user:pass@www.linkedin.com/in/janedoe",
+        "https://admin@linkedin.com/in/janedoe",
+        "https://user:password@in.linkedin.com/in/username",
+    ]
+    for url in credential_urls:
+        with pytest.raises(HTTPException) as exc_info:
+            LinkedInUrlService.validate_and_normalize_url(url)
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail["error"] == "CREDENTIALS_NOT_ALLOWED"
+
+
+def test_validate_linkedin_url_custom_ports_rejected():
+    """Verifies that URLs specifying non-standard ports are rejected."""
+    custom_port_urls = [
+        "https://www.linkedin.com:8080/in/janedoe",
+        "https://www.linkedin.com:8443/in/janedoe",
+        "https://linkedin.com:3000/in/janedoe",
+    ]
+    for url in custom_port_urls:
+        with pytest.raises(HTTPException) as exc_info:
+            LinkedInUrlService.validate_and_normalize_url(url)
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail["error"] == "UNEXPECTED_PORT"
 
 
 def test_validate_linkedin_url_invalid_paths():
@@ -286,6 +353,7 @@ def test_validate_linkedin_url_invalid_paths():
         "https://www.linkedin.com/company/google",
         "https://www.linkedin.com/feed/",
         "https://www.linkedin.com/",
+        "https://www.linkedin.com/school/stanford-university",
     ]
     for url in invalid_paths:
         with pytest.raises(HTTPException) as exc_info:
@@ -417,21 +485,75 @@ def test_analyze_text_insufficient_length(client: TestClient, valid_headers: dic
 
 
 # ---------------------------------------------------------------------------
-# 5. URL Endpoint Tests
+# ---------------------------------------------------------------------------
+# 5. URL Endpoint & Provider Tests
 # ---------------------------------------------------------------------------
 
-def test_analyze_url_success_mocked(client: TestClient, valid_headers: dict):
-    """Tests URL analysis endpoint with mocked probe and Gemini generation."""
-    with patch("app.services.linkedin_url_service.LinkedInUrlService.probe_profile_url") as mock_probe, \
-         patch("google.genai.Client") as mock_client_cls:
-        mock_probe.return_value = {
-            "accessible": True,
-            "status_code": 200,
-            "extracted_text": "Jane Doe Staff AI Engineer at ScaledTech",
-            "extracted_meta": {"title": "Jane Doe | LinkedIn"},
-            "limitations": [],
-        }
+def test_analyze_missing_api_key_url_endpoint(client: TestClient):
+    """Ensures 401 Unauthorized when X-Gemini-API-Key header is absent on URL endpoint."""
+    response = client.post(
+        "/api/linkedin/analyze-url",
+        json={"linkedin_url": "https://www.linkedin.com/in/janedoe", "target_role": "AI Developer"},
+    )
+    assert response.status_code == 401
+    assert "MISSING_API_KEY" in response.text
 
+
+def test_analyze_missing_api_key_text_endpoint(client: TestClient):
+    """Ensures 401 Unauthorized when X-Gemini-API-Key header is absent on text endpoint."""
+    response = client.post(
+        "/api/linkedin/analyze-text",
+        json={"profile_text": "A" * 60, "target_role": "AI Developer"},
+    )
+    assert response.status_code == 401
+    assert "MISSING_API_KEY" in response.text
+
+
+def test_analyze_url_inaccessible_no_fallback_text_returns_422(client: TestClient, valid_headers: dict):
+    """Verifies 422 Unprocessable Entity when profile data is inaccessible and no fallback text is supplied.
+    
+    Never calls Gemini with only the URL or pretends the profile was analyzed.
+    Returns clear actionable guidance pointing the user to profile text or PDF upload.
+    """
+    response = client.post(
+        "/api/linkedin/analyze-url",
+        headers=valid_headers,
+        json={
+            "linkedin_url": "https://www.linkedin.com/in/janedoe",
+            "target_role": "AI Developer",
+        },
+    )
+    assert response.status_code == 422
+    data = response.json()
+    detail = data.get("detail", {})
+    assert detail.get("error") == "PROFILE_DATA_UNAVAILABLE"
+    assert "suggested_actions" in detail
+    assert any("PDF" in action for action in detail["suggested_actions"])
+    assert detail.get("normalized_profile_url") == "https://www.linkedin.com/in/janedoe"
+
+
+def test_analyze_url_official_api_provider_mocked(client: TestClient, valid_headers: dict):
+    """Verifies successful profile evaluation via official LinkedIn API provider when configured."""
+    mock_official_content = (
+        "LinkedIn Profile URL: https://www.linkedin.com/in/janedoe\n"
+        "Candidate Name: Jane Doe\n"
+        "Professional Headline: Staff AI Engineer at ScaledTech\n"
+        "Email: jane.doe@example.com"
+    )
+    mock_official_result = ProfileAcquisitionResult(
+        success=True,
+        content=mock_official_content,
+        source="official_api",
+        available_sections=["identity", "headline", "contact_info"],
+        unavailable_sections=["experience", "education", "skills"],
+        limitations=["Basic Profile API data retrieved."],
+    )
+
+    with patch.object(
+        LinkedInProfileAcquisitionService,
+        "acquire_profile",
+        return_value=mock_official_result,
+    ), patch("google.genai.Client") as mock_client_cls:
         mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.text = MOCK_LINKEDIN_LLM_JSON
@@ -442,36 +564,174 @@ def test_analyze_url_success_mocked(client: TestClient, valid_headers: dict):
             "/api/linkedin/analyze-url",
             headers=valid_headers,
             json={
-                "url": "https://www.linkedin.com/in/janedoe",
+                "linkedin_url": "https://www.linkedin.com/in/janedoe",
                 "target_role": "AI Developer",
             },
         )
 
         assert response.status_code == 200
         data = response.json()
+        assert data["status"] == "completed"
         assert data["input_type"] == "url"
-        assert data["profile_url"] == "https://www.linkedin.com/in/janedoe"
+        assert data["normalized_profile_url"] == "https://www.linkedin.com/in/janedoe"
         assert data["overall_score"]["score"] == 92
 
 
-# ---------------------------------------------------------------------------
-# 6. Security & Error Handling Tests
-# ---------------------------------------------------------------------------
-
-def test_analyze_missing_api_key(client: TestClient):
-    """Ensures 401 Unauthorized when X-Gemini-API-Key header is absent."""
-    response = client.post(
-        "/api/linkedin/analyze-text",
-        json={"profile_text": "A" * 60, "target_role": "AI Developer"},
+def test_analyze_url_fallback_user_supplied_text(client: TestClient, valid_headers: dict):
+    """Verifies successful evaluation using user-supplied profile text fallback."""
+    user_text = (
+        "Jane Doe - Staff AI Engineer at ScaledTech. "
+        "Experienced in deploying large language models, vLLM inference optimization, PyTorch, and Kubernetes. "
+        "Education: Stanford University M.S. in Computer Science. "
+        "Over 8 years in high-throughput distributed AI systems."
     )
-    assert response.status_code == 401
-    assert "MISSING_API_KEY" in response.text
+
+    with patch("google.genai.Client") as mock_client_cls:
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = MOCK_LINKEDIN_LLM_JSON
+        mock_client.models.generate_content.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        response = client.post(
+            "/api/linkedin/analyze-url",
+            headers=valid_headers,
+            json={
+                "linkedin_url": "https://www.linkedin.com/in/janedoe",
+                "target_role": "AI Developer",
+                "profile_text": user_text,
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "completed"
+        assert data["input_type"] == "url"
+        assert data["target_role"] == "AI Developer"
+        assert data["overall_score"]["score"] == 92
+
+
+def test_analyze_url_gemini_validated_structured_schema(client: TestClient, valid_headers: dict):
+    """Verifies that the URL analysis output strictly conforms to the LinkedInAnalysisResult schema."""
+    user_text = "Jane Doe Staff AI Engineer. Skills: Python, PyTorch, Kubernetes. Education: Stanford."
+
+    with patch("google.genai.Client") as mock_client_cls:
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = MOCK_LINKEDIN_LLM_JSON
+        mock_client.models.generate_content.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        response = client.post(
+            "/api/linkedin/analyze-url",
+            headers=valid_headers,
+            json={
+                "linkedin_url": "https://www.linkedin.com/in/janedoe",
+                "target_role": "AI Developer",
+                "profile_text": user_text,
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Required root fields
+        assert data["status"] == "completed"
+        assert data["input_type"] == "url"
+        assert data["normalized_profile_url"] == "https://www.linkedin.com/in/janedoe"
+        assert data["target_role"] == "AI Developer"
+        assert isinstance(data["overall_score"]["score"], int)
+        assert data["overall_score"]["score"] == 92
+
+        # 10 section scores
+        assert "section_scores" in data
+        assert len(data["section_scores"]) == 10
+        for section_name in [
+            "headline", "about", "experience", "skills", "education",
+            "projects", "certifications", "keyword_optimization",
+            "profile_completeness", "target_role_alignment",
+        ]:
+            assert section_name in data["section_scores"]
+            assert 0 <= data["section_scores"][section_name]["score"] <= 100
+
+        # Detailed breakdown sections
+        assert len(data["strengths"]) > 0
+        assert len(data["weaknesses"]) > 0
+        assert "skills_analysis" in data
+        assert "experience_analysis" in data
+        assert "education_analysis" in data
+        assert "keyword_analysis" in data
+
+        # Actionable recommendations
+        assert data.get("recommended_headline") is not None
+        assert data.get("recommended_about") is not None
+        assert len(data.get("action_plan", [])) == 4
+        assert data["coverage_percentage"] == 100
+
+
+def test_analyze_url_malformed_gemini_json_returns_502(client: TestClient, valid_headers: dict):
+    """Verifies 502 Bad Gateway when Gemini returns non-JSON or malformed text."""
+    with patch("google.genai.Client") as mock_client_cls:
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = "This is plain conversational text without any valid JSON structure."
+        mock_client.models.generate_content.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        response = client.post(
+            "/api/linkedin/analyze-url",
+            headers=valid_headers,
+            json={
+                "linkedin_url": "https://www.linkedin.com/in/janedoe",
+                "target_role": "AI Developer",
+                "profile_text": "Jane Doe Staff AI Engineer at ScaledTech.",
+            },
+        )
+
+        assert response.status_code == 502
+        assert "MALFORMED_GEMINI_RESPONSE" in response.text
+
+
+def test_analyze_url_byok_key_non_persistence_and_redaction(
+    client: TestClient, valid_headers: dict, test_db_session
+):
+    """Verifies that user's Gemini API key is never persisted in DB or returned in response."""
+    test_key = valid_headers["X-Gemini-API-Key"]
+
+    with patch("google.genai.Client") as mock_client_cls:
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = MOCK_LINKEDIN_LLM_JSON
+        mock_client.models.generate_content.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        response = client.post(
+            "/api/linkedin/analyze-url",
+            headers=valid_headers,
+            json={
+                "linkedin_url": "https://www.linkedin.com/in/janedoe",
+                "target_role": "AI Developer",
+                "profile_text": "Jane Doe Staff AI Engineer at ScaledTech.",
+            },
+        )
+
+        assert response.status_code == 200
+        # Check response body does not contain key
+        assert test_key not in response.text
+
+        # Check DB records do not contain key
+        records = test_db_session.query(AnalysisHistory).all()
+        for rec in records:
+            assert test_key not in (rec.original_filename or "")
+            assert test_key not in (rec.target_role or "")
+            if rec.result_json:
+                assert test_key not in json.dumps(rec.result_json)
 
 
 def test_analyze_gemini_rate_limit_mocked(client: TestClient, valid_headers: dict):
     """Ensures 429 response when Google Gemini quota is exceeded."""
     with patch("google.genai.Client") as mock_client_cls, \
-         patch("time.sleep"):  # Mock out sleep to avoid waiting during test retries
+         patch("time.sleep"):
         mock_client = MagicMock()
         err = genai_errors.APIError(429, "Resource has been exhausted", None)
         mock_client.models.generate_content.side_effect = err

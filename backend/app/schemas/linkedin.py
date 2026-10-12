@@ -1,6 +1,7 @@
+import uuid
 from datetime import datetime, timezone
-from typing import List, Optional
-from pydantic import BaseModel, Field
+from typing import List, Optional, Any, Dict
+from pydantic import BaseModel, Field, model_validator
 
 
 class ScoreDetail(BaseModel):
@@ -186,28 +187,39 @@ class LinkedInSectionScores(BaseModel):
 
 class LinkedInAnalysisResult(BaseModel):
     """Complete root response payload for a LinkedIn profile evaluation."""
-    id: str
+    status: str = Field("completed", description="Execution status: completed")
     input_type: str = Field(..., description="Method used: 'url', 'pdf', or 'text'")
-    profile_url: Optional[str] = None
-    target_role: str
-    model_used: str
+    normalized_profile_url: Optional[str] = Field(None, description="Normalized HTTPS profile URL")
+    profile_url: Optional[str] = Field(None, description="Profile URL alias for backward compatibility")
+    target_role: str = Field(..., description="Target job title / role benchmarked")
+    profile: Optional[ProfileIdentity] = Field(None, description="Extracted profile identity")
+    profile_identity: Optional[ProfileIdentity] = Field(None, description="Profile identity alias")
+    overall_score: ScoreDetail = Field(..., description="Overall score and qualitative justification")
+    section_scores: LinkedInSectionScores = Field(..., description="Individual section score cards")
+    strengths: List[str] = Field(default_factory=list, description="Primary candidate strengths")
+    weaknesses: List[str] = Field(default_factory=list, description="Primary candidate weaknesses and gaps")
+    skills_analysis: SkillsAnalysis = Field(..., description="Skills evaluation")
+    experience_analysis: ExperienceAnalysis = Field(..., description="Work experience evaluation")
+    education_analysis: EducationAnalysis = Field(..., description="Education credentials evaluation")
+    projects_analysis: Optional[ProjectAnalysis] = Field(None, description="Project portfolio evaluation")
+    project_analysis: Optional[ProjectAnalysis] = Field(None, description="Project evaluation alias")
+    certifications_analysis: List[str] = Field(default_factory=list, description="Certifications and licenses evaluation")
+    keyword_analysis: KeywordAnalysis = Field(..., description="Recruiter keyword search optimization")
+    recommended_headline: Optional[str] = Field(None, description="Primary recommended headline rewrite")
+    recommended_about: Optional[str] = Field(None, description="Recommended rewritten About section")
+    action_plan: List[PlanWeek] = Field(default_factory=list, description="Prioritized 30-day action plan")
+    available_sections: List[str] = Field(default_factory=list, description="Profile sections with verifiable evidence")
+    unavailable_sections: List[str] = Field(default_factory=list, description="Profile sections absent from input")
+    coverage_percentage: int = Field(0, ge=0, le=100, description="Percentage of standard sections evaluated")
+    coverage_information: Optional[CoverageInformation] = Field(None, description="Coverage calculation breakdown")
+    limitations: List[str] = Field(default_factory=list, description="Any data limitations encountered")
+    headline_analysis: Optional[HeadlineAnalysis] = None
+    about_analysis: Optional[AboutAnalysis] = None
+    additional_sections: Optional[AdditionalSectionsAnalysis] = None
+    target_role_alignment: Optional[TargetRoleAlignment] = None
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    profile_identity: ProfileIdentity
-    available_sections: List[str]
-    unavailable_sections: List[str]
-    coverage_information: CoverageInformation
-    overall_score: ScoreDetail
-    section_scores: LinkedInSectionScores
-    headline_analysis: HeadlineAnalysis
-    about_analysis: AboutAnalysis
-    experience_analysis: ExperienceAnalysis
-    education_analysis: EducationAnalysis
-    skills_analysis: SkillsAnalysis
-    project_analysis: ProjectAnalysis
-    additional_sections: AdditionalSectionsAnalysis
-    keyword_analysis: KeywordAnalysis
-    target_role_alignment: TargetRoleAlignment
-    limitations: List[str] = Field(default_factory=list)
+    model_used: str = Field("gemini-2.5-flash", description="Gemini model utilized")
     disclaimer: str = (
         "This AI-generated analysis is an advisory evaluation benchmarked against standard industry hiring practices "
         "and recruiter search patterns. It is NOT an official LinkedIn rating, does not guarantee job placement or "
@@ -217,15 +229,43 @@ class LinkedInAnalysisResult(BaseModel):
 
 class LinkedInUrlRequest(BaseModel):
     """Request payload for LinkedIn profile URL analysis."""
-    url: str = Field(..., description="Public LinkedIn profile URL (e.g. https://www.linkedin.com/in/username)")
-    target_role: str = Field(..., min_length=2, max_length=100, description="Target career role")
+    linkedin_url: Optional[str] = Field(None, description="Public LinkedIn profile URL (e.g. https://www.linkedin.com/in/username)")
+    url: Optional[str] = Field(None, description="Public LinkedIn profile URL alias")
+    target_role: str = Field("AI Developer", min_length=2, max_length=100, description="Target career role")
+    profile_text: Optional[str] = Field(None, description="Optional profile text supplied by user")
+    fallback_text: Optional[str] = Field(None, description="Optional additional profile text alias")
     model: Optional[str] = Field(None, description="Optional chosen Gemini model")
-    fallback_text: Optional[str] = Field(None, description="Optional additional profile text provided as fallback")
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Resolve URL alias
+            u = data.get("linkedin_url") or data.get("url")
+            if u is not None:
+                data["linkedin_url"] = u
+                data["url"] = u
+            # Resolve profile text alias
+            t = data.get("profile_text") or data.get("fallback_text")
+            if t is not None:
+                data["profile_text"] = t
+                data["fallback_text"] = t
+        return data
+
+    @property
+    def effective_url(self) -> str:
+        return (self.linkedin_url or self.url or "").strip()
+
+    @property
+    def effective_profile_text(self) -> Optional[str]:
+        t = self.profile_text or self.fallback_text
+        return t.strip() if t else None
 
 
 class LinkedInTextRequest(BaseModel):
     """Request payload for pasted LinkedIn profile text analysis."""
     profile_text: str = Field(..., min_length=50, description="Pasted text copied from a LinkedIn profile")
-    target_role: str = Field(..., min_length=2, max_length=100, description="Target career role")
+    target_role: str = Field("AI Developer", min_length=2, max_length=100, description="Target career role")
     model: Optional[str] = Field(None, description="Optional chosen Gemini model")
     profile_url: Optional[str] = Field(None, description="Optional associated LinkedIn profile URL")
+

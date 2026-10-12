@@ -13,12 +13,17 @@ from app.schemas.linkedin import (
     LinkedInTextRequest,
 )
 from app.services.analysis_history_service import AnalysisHistoryService
+from app.services.linkedin_profile_provider import (
+    LinkedInProfileAcquisitionService,
+    ProfileAcquisitionResult,
+)
 from app.services.linkedin_service import LinkedInService
 from app.services.linkedin_url_service import LinkedInUrlService
 from app.services.resume_service import ResumeService
 
 settings = get_settings()
 router = APIRouter(prefix="/linkedin", tags=["LinkedIn Analyzer"])
+profile_acquisition_service = LinkedInProfileAcquisitionService()
 
 
 @router.post(
@@ -26,7 +31,7 @@ router = APIRouter(prefix="/linkedin", tags=["LinkedIn Analyzer"])
     response_model=LinkedInAnalysisResult,
     status_code=status.HTTP_200_OK,
     summary="Analyze LinkedIn Profile via URL",
-    description="Validates a public LinkedIn URL, checks accessibility, and performs deep role-benchmarked analysis using BYOK Gemini.",
+    description="Validates a public LinkedIn URL, acquires profile content through authorized providers or user text, and performs role-benchmarked analysis using BYOK Gemini.",
 )
 @limiter.limit("10/minute")
 async def analyze_linkedin_url(
@@ -35,38 +40,66 @@ async def analyze_linkedin_url(
     api_key: str = Depends(get_gemini_api_key),
     db: Session = Depends(get_db),
 ) -> LinkedInAnalysisResult:
-    """Evaluates a public LinkedIn profile from URL without bypassing authwalls or using unauthorized scrapers."""
+    """Evaluates a public LinkedIn profile from URL using authorized providers without unauthorized scrapers."""
     # 1. Validate & normalize URL
-    normalized_url, _username = LinkedInUrlService.validate_and_normalize_url(payload.url)
-
-    # 2. Probe profile URL
-    probe_result = await LinkedInUrlService.probe_profile_url(normalized_url)
-
-    content_to_analyze = probe_result.get("extracted_text", "")
-    if payload.fallback_text:
-        content_to_analyze = f"{content_to_analyze}\n\nAdditional Profile Information:\n{payload.fallback_text}".strip()
-
-    if not content_to_analyze:
-        # Direct access was blocked and no fallback text was provided
-        content_to_analyze = (
-            f"LinkedIn Profile URL: {normalized_url}\n"
-            f"Notice: Direct full profile scraping was restricted by LinkedIn's authentication walls. "
-            f"Evaluate the URL structure and common positioning requirements for {payload.target_role}."
+    target_url = payload.linkedin_url or payload.url
+    if not target_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "EMPTY_URL",
+                "message": "LinkedIn profile URL is required.",
+            },
         )
 
-    # 3. Execute analysis with Gemini
+    normalized_url, username = LinkedInUrlService.validate_and_normalize_url(target_url)
+
+    # 2. Acquire profile data via authorized provider
+    profile_text = payload.profile_text or payload.fallback_text
+    acquisition: ProfileAcquisitionResult = await profile_acquisition_service.acquire_profile(
+        url=normalized_url,
+        username=username,
+        profile_text=profile_text,
+    )
+
+    # 3. If profile content cannot be retrieved, return clear 422 with actionable guidance
+    if not acquisition.success or not acquisition.content:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error": "PROFILE_DATA_UNAVAILABLE",
+                "message": acquisition.actionable_message or (
+                    "LinkedIn profile content cannot be retrieved directly from the URL alone. "
+                    "Due to LinkedIn's strict access controls, direct public scraping is restricted without authorized API permissions. "
+                    "Please provide your profile text using the 'profile_text' field or upload your official LinkedIn profile PDF using the LinkedIn PDF Analyzer."
+                ),
+                "limitations": acquisition.limitations,
+                "suggested_actions": [
+                    "Provide your profile text using the 'profile_text' field.",
+                    "Export your profile as PDF from LinkedIn ('More' -> 'Save to PDF') and use the /api/linkedin/analyze-pdf endpoint.",
+                ],
+                "normalized_profile_url": normalized_url,
+            },
+        )
+
+    # 4. Execute analysis with Gemini
     result = await LinkedInService.analyze_profile(
         api_key=api_key,
-        profile_content=content_to_analyze,
+        profile_content=acquisition.content,
         target_role=payload.target_role,
         input_type="url",
         profile_url=normalized_url,
         model_name=payload.model,
-        extra_limitations=probe_result.get("limitations", []),
+        extra_limitations=acquisition.limitations,
     )
 
-    # 4. Record to analysis history
+    # 5. Record to analysis history
     try:
+        ats_score_val = (
+            result.target_role_alignment.alignment_score
+            if result.target_role_alignment
+            else result.section_scores.target_role_alignment.score
+        )
         AnalysisHistoryService.record_analysis(
             db=db,
             filename=f"url:{normalized_url}",
@@ -74,7 +107,7 @@ async def analyze_linkedin_url(
             status="completed",
             analysis_type="linkedin",
             overall_score=result.overall_score.score,
-            ats_score=result.target_role_alignment.alignment_score,
+            ats_score=ats_score_val,
             result_json=result.model_dump(),
         )
     except Exception as e:

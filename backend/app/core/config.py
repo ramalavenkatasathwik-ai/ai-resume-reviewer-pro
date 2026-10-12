@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     RATE_LIMIT_ANALYZE_PER_MINUTE: int = 10
     REDIS_URL: Optional[str] = None
 
+    # Official LinkedIn API settings (optional, enabled only when approved permissions are configured)
+    LINKEDIN_CLIENT_ID: Optional[str] = None
+    LINKEDIN_CLIENT_SECRET: Optional[str] = None
+    LINKEDIN_ACCESS_TOKEN: Optional[str] = None
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:

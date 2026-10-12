@@ -372,10 +372,74 @@ JSON Output Schema Specification:
         # Inject runtime metadata
         record_id = str(uuid.uuid4())
         data["id"] = record_id
+        data["status"] = "completed"
         data["input_type"] = input_type
+        data["normalized_profile_url"] = profile_url
         data["profile_url"] = profile_url
         data["target_role"] = target_role
         data["model_used"] = model_used
+
+        # Synchronize profile identity
+        profile_obj = data.get("profile") or data.get("profile_identity")
+        data["profile"] = profile_obj
+        data["profile_identity"] = profile_obj
+
+        # Synchronize project analysis
+        project_obj = data.get("projects_analysis") or data.get("project_analysis")
+        data["projects_analysis"] = project_obj
+        data["project_analysis"] = project_obj
+
+        # Extract recommendations & action plan
+        tra = data.get("target_role_alignment")
+        if isinstance(tra, dict):
+            if not data.get("recommended_headline"):
+                data["recommended_headline"] = tra.get("suggested_headline")
+            if not data.get("recommended_about"):
+                data["recommended_about"] = tra.get("suggested_about_summary")
+            if not data.get("action_plan"):
+                data["action_plan"] = tra.get("prioritized_30_day_plan") or []
+
+        if not data.get("recommended_headline") and data.get("headline_analysis"):
+            ha = data["headline_analysis"]
+            if isinstance(ha, dict) and ha.get("suggested_improved_headlines"):
+                data["recommended_headline"] = ha["suggested_improved_headlines"][0]
+
+        if not data.get("recommended_about") and data.get("about_analysis"):
+            aa = data["about_analysis"]
+            if isinstance(aa, dict):
+                data["recommended_about"] = aa.get("suggested_rewritten_about")
+
+        # Synthesize strengths & weaknesses if not at root
+        if not data.get("strengths"):
+            strengths_list = []
+            if data.get("headline_analysis") and isinstance(data["headline_analysis"], dict):
+                strengths_list.extend(data["headline_analysis"].get("strengths", []))
+            if data.get("experience_analysis") and isinstance(data["experience_analysis"], dict):
+                strengths_list.extend(data["experience_analysis"].get("overall_experience_strengths", []))
+            if data.get("education_analysis") and isinstance(data["education_analysis"], dict):
+                strengths_list.extend(data["education_analysis"].get("strengths", []))
+            if isinstance(tra, dict):
+                strengths_list.extend(tra.get("demonstrated_competencies", []))
+            data["strengths"] = strengths_list[:6] or ["Demonstrated career progression and technical foundation."]
+
+        if not data.get("weaknesses"):
+            weaknesses_list = []
+            if data.get("headline_analysis") and isinstance(data["headline_analysis"], dict):
+                weaknesses_list.extend(data["headline_analysis"].get("weaknesses", []))
+            if data.get("experience_analysis") and isinstance(data["experience_analysis"], dict):
+                weaknesses_list.extend(data["experience_analysis"].get("overall_experience_weaknesses", []))
+            if isinstance(tra, dict):
+                weaknesses_list.extend(tra.get("critical_skill_gaps", []))
+            data["weaknesses"] = weaknesses_list[:6] or ["Increase quantifiable metrics and target role keyword density."]
+
+        # Certifications analysis
+        if not data.get("certifications_analysis"):
+            certs = []
+            if data.get("additional_sections") and isinstance(data["additional_sections"], dict):
+                certs = data["additional_sections"].get("certifications") or []
+            if not certs and isinstance(tra, dict):
+                certs = tra.get("recommended_certifications") or []
+            data["certifications_analysis"] = certs
 
         # Combine limitations
         existing_limitations = data.get("limitations") or []
@@ -385,11 +449,11 @@ JSON Output Schema Specification:
         # Compute CoverageInformation dynamically
         available = data.get("available_sections") or []
         unavailable = data.get("unavailable_sections") or []
-        
-        # Ensure available and unavailable sections are consistent
+
         assessed_count = len(available)
         total_sections = 10
         coverage_pct = min(100, max(0, int((assessed_count / total_sections) * 100)))
+        data["coverage_percentage"] = coverage_pct
 
         coverage_info = {
             "assessed_sections_count": assessed_count,
