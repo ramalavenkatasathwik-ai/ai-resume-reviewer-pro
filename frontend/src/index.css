@@ -43,10 +43,39 @@
 
 @media print {
   body {
-    background: white !important;
-    color: black !important;
+    background: #ffffff !important;
+    color: #111827 !important;
   }
-  .no-print {
+  .no-print,
+  button:not(.print-show),
+  nav,
+  header {
     display: none !important;
   }
+  .bg-\[\#0B0B0E\],
+  .bg-\[\#141419\],
+  .bg-\[\#1C1C23\],
+  .bg-\[\#1E1E26\] {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border-color: #e5e7eb !important;
+    box-shadow: none !important;
+  }
+  .text-white,
+  .text-slate-100,
+  .text-slate-200,
+  .text-slate-300 {
+    color: #111827 !important;
+  }
+  .text-slate-400,
+  .text-slate-500 {
+    color: #4b5563 !important;
+  }
+  section,
+  .rounded-2xl,
+  .rounded-xl {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
+

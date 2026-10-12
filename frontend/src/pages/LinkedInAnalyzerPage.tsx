@@ -10,23 +10,17 @@ import {
   ArrowRight,
   CheckCircle2,
   AlertCircle,
-  Copy,
-  Check,
-  Printer,
-  RotateCcw,
   UploadCloud,
   FileCheck,
   ChevronDown,
   ChevronUp,
   Info,
   ExternalLink,
-  Briefcase,
-  Layers,
   Search,
-  Calendar,
 } from 'lucide-react';
 import { linkedinService } from '@/services/linkedinService';
 import { LinkedInAnalysisResult } from '@/types/linkedin';
+import { AnalysisDashboard } from '@/components/dashboard';
 
 const PRESET_ROLES = [
   'AI Developer',
@@ -48,13 +42,8 @@ export const LinkedInAnalyzerPage: React.FC = () => {
   const [targetRole, setTargetRole] = useState('AI Developer');
   const [customRoleInput, setCustomRoleInput] = useState('');
   const [isCustomRole, setIsCustomRole] = useState(false);
-  const [apiKey, setApiKey] = useState(() => {
-    try {
-      return localStorage.getItem('gemini_api_key') || '';
-    } catch {
-      return '';
-    }
-  });
+  // Memory-only API key state (strictly never stored in localStorage/sessionStorage)
+  const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
   const [availableModels, setAvailableModels] = useState<string[]>([
@@ -92,19 +81,6 @@ export const LinkedInAnalyzerPage: React.FC = () => {
     normalizedUrl?: string;
   } | null>(null);
   const [analysisResult, setAnalysisResult] = useState<LinkedInAnalysisResult | null>(null);
-
-  // Accordion toggle states
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    headline: true,
-    about: true,
-    experience: true,
-    skills: true,
-    alignment: true,
-    actionPlan: true,
-  });
-
-  // Copy feedback state
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Drag and drop state
   const [isDragging, setIsDragging] = useState(false);
@@ -236,6 +212,7 @@ export const LinkedInAnalyzerPage: React.FC = () => {
   };
 
   const handleAnalyze = async () => {
+    if (isLoading) return;
     const effectiveRole = isCustomRole ? customRoleInput.trim() : targetRole;
     if (!effectiveRole) {
       setErrorMessage('Please specify a target career role.');
@@ -340,20 +317,6 @@ export const LinkedInAnalyzerPage: React.FC = () => {
     }
   };
 
-  const copyToClipboard = (text: string, key: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2500);
-  };
-
-  const toggleSection = (section: string) => {
-    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
-
-  const printReport = () => {
-    window.print();
-  };
-
   return (
     <div className="min-h-screen bg-[#0B0B0E] text-slate-100 py-10 px-4 sm:px-6 lg:px-8 selection:bg-[#FF7417] selection:text-black">
       {/* Top Header */}
@@ -370,28 +333,6 @@ export const LinkedInAnalyzerPage: React.FC = () => {
             Audit your LinkedIn headline, summary, work experience, and competencies against strict recruiter filters and target job benchmarks.
           </p>
         </div>
-
-        {analysisResult && (
-          <div className="flex items-center gap-3">
-            <button
-              onClick={printReport}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E1E26] hover:bg-[#282834] border border-[#282834] text-xs font-bold text-slate-200 transition-colors"
-            >
-              <Printer className="w-4 h-4 text-[#FF7417]" />
-              Print / Save PDF Report
-            </button>
-            <button
-              onClick={() => {
-                setAnalysisResult(null);
-                setErrorMessage(null);
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#141419] hover:bg-[#1E1E26] border border-[#282834] text-xs font-bold text-slate-300 transition-colors"
-            >
-              <RotateCcw className="w-4 h-4" />
-              New Analysis
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="max-w-6xl mx-auto space-y-8">
@@ -933,517 +874,13 @@ export const LinkedInAnalyzerPage: React.FC = () => {
             </div>
           </>
         ) : (
-          /* ========================================================== */
-          /* COMPLETE RESULTS VIEW                                      */
-          /* ========================================================== */
-          <div className="space-y-8 animate-fade-in print:text-black">
-            {/* Candidate Identity Header */}
-            <div className="bg-[#141419] rounded-2xl border border-[#282834] p-6 sm:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-[#1E1E26] text-[#FF7417] border border-[#282834]">
-                    Mode: {analysisResult.input_type.toUpperCase()}
-                  </span>
-                  {analysisResult.original_filename && (
-                    <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-[#1E1E26] text-slate-300 border border-[#282834]">
-                      File: {analysisResult.original_filename}
-                    </span>
-                  )}
-                  {analysisResult.extraction_method && (
-                    <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-emerald-950/60 text-emerald-300 border border-emerald-800/40">
-                      Extraction: {analysisResult.extraction_method === 'gemini_multimodal_pdf' ? 'Multimodal Vision' : 'Embedded PDF Text'}
-                    </span>
-                  )}
-                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-950/60 text-indigo-300 border border-indigo-800/40">
-                    Target: {analysisResult.target_role}
-                  </span>
-                  <span className="text-xs font-mono text-slate-500">
-                    Model: {analysisResult.model_used}
-                  </span>
-                </div>
-
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-                  {analysisResult.profile_identity?.name || 'Candidate Profile'}
-                </h2>
-
-                <p className="text-sm text-slate-300 max-w-2xl font-medium">
-                  {analysisResult.profile_identity?.headline || 'No headline specified in input'}
-                </p>
-
-                {analysisResult.profile_identity?.location && (
-                  <p className="text-xs text-slate-400">
-                    📍 {analysisResult.profile_identity.location} • {analysisResult.profile_identity.industry || 'Tech'}
-                  </p>
-                )}
-              </div>
-
-              {/* Overall Score Badge */}
-              <div className="bg-[#0B0B0E] border border-[#282834] rounded-2xl p-6 text-center min-w-[200px]">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Overall Profile Score
-                </span>
-                <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#F04452] to-[#FF7417] mt-1">
-                  {analysisResult.overall_score.score}
-                  <span className="text-sm text-slate-500 font-normal">/100</span>
-                </div>
-                <p className="text-xs text-slate-300 mt-2 font-medium">
-                  {analysisResult.overall_score.score >= 85
-                    ? 'Exceptional Alignment'
-                    : analysisResult.overall_score.score >= 70
-                    ? 'Competitive Profile'
-                    : 'Needs Strategic Polish'}
-                </p>
-              </div>
-            </div>
-
-            {/* Coverage Indicator Card */}
-            <div className="bg-[#141419] rounded-2xl border border-[#282834] p-6 space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-[#FF7417]" />
-                  <h3 className="text-sm font-bold text-white">
-                    Profile Evidence Coverage: {analysisResult.coverage_information.coverage_percentage}%
-                  </h3>
-                </div>
-                <span className="text-xs font-mono text-slate-400">
-                  {analysisResult.coverage_information.assessed_sections_count} of{' '}
-                  {analysisResult.coverage_information.total_possible_sections} standard sections evaluated
-                </span>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="w-full bg-[#0B0B0E] h-2.5 rounded-full overflow-hidden border border-[#282834]">
-                <div
-                  className="bg-gradient-to-r from-[#C91432] via-[#F04452] to-[#FF7417] h-full"
-                  style={{ width: `${analysisResult.coverage_information.coverage_percentage}%` }}
-                />
-              </div>
-
-              <p className="text-xs text-slate-400 leading-relaxed">
-                {analysisResult.coverage_information.calculation_methodology}
-              </p>
-
-              {analysisResult.limitations && analysisResult.limitations.length > 0 && (
-                <div className="mt-3 p-3 rounded-xl bg-amber-950/30 border border-amber-800/40 text-xs text-amber-300 space-y-1">
-                  <p className="font-bold flex items-center gap-1.5">
-                    <Info className="w-3.5 h-3.5" /> Note on Access Limitations:
-                  </p>
-                  <ul className="list-disc list-inside space-y-0.5 text-amber-200/90 pl-1">
-                    {analysisResult.limitations.map((lim, idx) => (
-                      <li key={idx}>{lim}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            {/* 10 Section Scores Grid */}
-            <div>
-              <h3 className="text-base font-extrabold text-white mb-4 flex items-center gap-2">
-                <Layers className="w-4 h-4 text-[#FF7417]" />
-                Section Score Breakdown (0 - 100)
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                {Object.entries(analysisResult.section_scores).map(([key, val]) => (
-                  <div
-                    key={key}
-                    className="bg-[#141419] rounded-xl border border-[#282834] p-4 flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold capitalize text-slate-400">
-                          {key.replace(/_/g, ' ')}
-                        </span>
-                        <span
-                          className={`text-xs font-black px-2 py-0.5 rounded-md ${
-                            val.score >= 85
-                              ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                              : val.score >= 70
-                              ? 'bg-amber-950 text-amber-400 border border-amber-800'
-                              : 'bg-rose-950 text-rose-400 border border-rose-800'
-                          }`}
-                        >
-                          {val.score}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-300 mt-2 line-clamp-3 leading-relaxed">
-                        {val.explanation}
-                      </p>
-                    </div>
-                    {val.recommended_actions?.[0] && (
-                      <p className="text-[10px] text-[#FF7417] mt-3 pt-2 border-t border-[#282834] font-medium line-clamp-2">
-                        💡 {val.recommended_actions[0]}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Detailed Section Analyses (Accordions) */}
-            <div className="space-y-4">
-              {/* 1. Headline Analysis */}
-              <div className="bg-[#141419] rounded-2xl border border-[#282834] overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => toggleSection('headline')}
-                  className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-[#1E1E26] transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#FF7417]/10 text-[#FF7417] flex items-center justify-center font-bold">
-                      H
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Headline & Identity Positioning</h4>
-                      <p className="text-xs text-slate-400">Keywords, value proposition, and suggested rewrites</p>
-                    </div>
-                  </div>
-                  {expandedSections.headline ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                </button>
-
-                {expandedSections.headline && (
-                  <div className="p-6 border-t border-[#282834] space-y-5 text-xs text-slate-300">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-4 rounded-xl bg-[#0B0B0E] border border-[#282834] space-y-2">
-                        <p className="font-bold text-slate-200">Clarity & Value Proposition</p>
-                        <p className="leading-relaxed">{analysisResult.headline_analysis.clarity_and_specificity}</p>
-                        <p className="text-slate-400 mt-2 font-medium">{analysisResult.headline_analysis.value_proposition}</p>
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-[#0B0B0E] border border-[#282834] space-y-2">
-                        <p className="font-bold text-slate-200">Role Alignment & Keywords</p>
-                        <p className="leading-relaxed">{analysisResult.headline_analysis.target_role_alignment}</p>
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {analysisResult.headline_analysis.relevant_keywords.map((kw, i) => (
-                            <span key={i} className="px-2 py-0.5 rounded bg-[#1E1E26] text-[#FF7417] font-mono text-[10px]">
-                              {kw}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Suggested Headline Variations */}
-                    <div>
-                      <p className="font-bold text-white text-xs uppercase tracking-wider mb-2">
-                        Suggested Improved Headlines (Optimized for Recruiter Search)
-                      </p>
-                      <div className="space-y-2">
-                        {analysisResult.headline_analysis.suggested_improved_headlines.map((hl, idx) => (
-                          <div
-                            key={idx}
-                            className="p-3 rounded-xl bg-[#0B0B0E] border border-[#282834] flex items-center justify-between gap-3 group"
-                          >
-                            <p className="font-mono text-slate-200 text-xs">{hl}</p>
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(hl, `headline-${idx}`)}
-                              className="px-2.5 py-1 rounded bg-[#1E1E26] hover:bg-[#282834] text-slate-300 text-[11px] font-semibold shrink-0 flex items-center gap-1 transition-colors"
-                            >
-                              {copiedKey === `headline-${idx}` ? (
-                                <>
-                                  <Check className="w-3.5 h-3.5 text-emerald-400" /> Copied
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-3.5 h-3.5" /> Copy
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 2. About Section Analysis */}
-              <div className="bg-[#141419] rounded-2xl border border-[#282834] overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => toggleSection('about')}
-                  className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-[#1E1E26] transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#F04452]/10 text-[#F04452] flex items-center justify-center font-bold">
-                      A
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">About Section & Narrative Impact</h4>
-                      <p className="text-xs text-slate-400">Career story, quantifiable metrics, and full rewritten summary</p>
-                    </div>
-                  </div>
-                  {expandedSections.about ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                </button>
-
-                {expandedSections.about && (
-                  <div className="p-6 border-t border-[#282834] space-y-5 text-xs text-slate-300">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-4 rounded-xl bg-[#0B0B0E] border border-[#282834] space-y-2">
-                        <p className="font-bold text-slate-200">Career Narrative & Identity</p>
-                        <p className="leading-relaxed">
-                          {analysisResult.about_analysis.career_narrative || 'No career narrative was observed.'}
-                        </p>
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-[#0B0B0E] border border-[#282834] space-y-2">
-                        <p className="font-bold text-slate-200">Impact & Missing Information</p>
-                        <p className="leading-relaxed">
-                          {analysisResult.about_analysis.evidence_of_impact || 'Impact statements are lacking.'}
-                        </p>
-                        {analysisResult.about_analysis.missing_information.length > 0 && (
-                          <ul className="list-disc list-inside text-rose-300 mt-2 space-y-0.5">
-                            {analysisResult.about_analysis.missing_information.map((m, i) => (
-                              <li key={i}>{m}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </div>
-
-                    {analysisResult.about_analysis.suggested_rewritten_about && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <p className="font-bold text-white text-xs uppercase tracking-wider">
-                            Suggested Rewritten About Section
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              copyToClipboard(
-                                analysisResult.about_analysis.suggested_rewritten_about || '',
-                                'about-rewrite'
-                              )
-                            }
-                            className="px-2.5 py-1 rounded bg-[#1E1E26] hover:bg-[#282834] text-slate-200 text-[11px] font-semibold flex items-center gap-1"
-                          >
-                            {copiedKey === 'about-rewrite' ? (
-                              <>
-                                <Check className="w-3.5 h-3.5 text-emerald-400" /> Copied
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3.5 h-3.5" /> Copy Summary
-                              </>
-                            )}
-                          </button>
-                        </div>
-                        <div className="p-4 rounded-xl bg-[#0B0B0E] border border-[#282834] whitespace-pre-line font-mono text-slate-300 leading-relaxed text-xs">
-                          {analysisResult.about_analysis.suggested_rewritten_about}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* 3. Work Experience Breakdown */}
-              <div className="bg-[#141419] rounded-2xl border border-[#282834] overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => toggleSection('experience')}
-                  className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-[#1E1E26] transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
-                      <Briefcase className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Experience & Role Achievements</h4>
-                      <p className="text-xs text-slate-400">
-                        {analysisResult.experience_analysis.roles_analyzed_count} roles analyzed with quantifiable outcome assessments
-                      </p>
-                    </div>
-                  </div>
-                  {expandedSections.experience ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                </button>
-
-                {expandedSections.experience && (
-                  <div className="p-6 border-t border-[#282834] space-y-6 text-xs text-slate-300">
-                    {analysisResult.experience_analysis.roles.map((role, idx) => (
-                      <div key={idx} className="p-5 rounded-xl bg-[#0B0B0E] border border-[#282834] space-y-3">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pb-3 border-b border-[#282834]">
-                          <div>
-                            <h5 className="text-sm font-bold text-white">{role.job_title}</h5>
-                            <p className="text-xs text-[#FF7417] font-semibold">{role.organization}</p>
-                          </div>
-                          {role.dates && (
-                            <span className="text-[11px] font-mono text-slate-500">{role.dates}</span>
-                          )}
-                        </div>
-
-                        {role.achievements.length > 0 && (
-                          <div>
-                            <p className="font-bold text-slate-300 text-[11px] uppercase tracking-wider mb-1">
-                              Evidenced Achievements
-                            </p>
-                            <ul className="list-disc list-inside space-y-1 text-slate-300">
-                              {role.achievements.map((ach, i) => (
-                                <li key={i}>{ach}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {role.quantifiable_outcomes.length > 0 && (
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            {role.quantifiable_outcomes.map((out, i) => (
-                              <span key={i} className="px-2.5 py-1 rounded bg-emerald-950/50 border border-emerald-800 text-emerald-300 text-[11px] font-mono">
-                                📈 {out}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {role.suggested_rewritten_description && (
-                          <div className="pt-2">
-                            <div className="flex items-center justify-between mb-1.5">
-                              <span className="text-[11px] font-bold text-[#FF7417] uppercase tracking-wider">
-                                Suggested High-Impact Bullet Rewrite
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  copyToClipboard(role.suggested_rewritten_description || '', `role-${idx}`)
-                                }
-                                className="px-2 py-0.5 rounded bg-[#1E1E26] hover:bg-[#282834] text-slate-300 text-[10px] font-semibold flex items-center gap-1"
-                              >
-                                {copiedKey === `role-${idx}` ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                                Copy
-                              </button>
-                            </div>
-                            <p className="p-3 rounded-lg bg-[#141419] border border-[#282834] text-slate-200 font-mono text-[11px]">
-                              {role.suggested_rewritten_description}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* 4. Skills & Keyword Optimization */}
-              <div className="bg-[#141419] rounded-2xl border border-[#282834] overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => toggleSection('skills')}
-                  className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-[#1E1E26] transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold">
-                      <Search className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Skills Matrix & Keyword Search Optimization</h4>
-                      <p className="text-xs text-slate-400">Demonstrated competencies, critical missing keywords, and search filters</p>
-                    </div>
-                  </div>
-                  {expandedSections.skills ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                </button>
-
-                {expandedSections.skills && (
-                  <div className="p-6 border-t border-[#282834] space-y-6 text-xs text-slate-300">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div className="p-4 rounded-xl bg-[#0B0B0E] border border-[#282834] space-y-3">
-                        <p className="font-bold text-emerald-400 uppercase tracking-wider text-[11px]">
-                          ✓ Role-Relevant & Evidenced Skills
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {analysisResult.skills_analysis.role_relevant_skills.map((s, i) => (
-                            <span key={i} className="px-2.5 py-1 rounded bg-[#1E1E26] text-slate-200 border border-[#282834] font-mono text-[11px]">
-                              {s}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-[#0B0B0E] border border-[#282834] space-y-3">
-                        <p className="font-bold text-rose-400 uppercase tracking-wider text-[11px]">
-                          ⚠ Critical Missing Keywords for {analysisResult.target_role}
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {analysisResult.keyword_analysis.missing_critical_keywords.map((kw, i) => (
-                            <span key={i} className="px-2.5 py-1 rounded bg-rose-950/40 border border-rose-800 text-rose-300 font-mono text-[11px]">
-                              +{kw}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 rounded-xl bg-[#0B0B0E] border border-[#282834] space-y-2">
-                      <p className="font-bold text-slate-200 uppercase tracking-wider text-[11px]">
-                        Strategic Keyword Placement Advice
-                      </p>
-                      <ul className="list-disc list-inside space-y-1 text-slate-300">
-                        {analysisResult.keyword_analysis.strategic_placement_advice.map((adv, i) => (
-                          <li key={i}>{adv}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 5. 30-Day Prioritized Action Plan */}
-              <div className="bg-[#141419] rounded-2xl border border-[#282834] overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => toggleSection('actionPlan')}
-                  className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-[#1E1E26] transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#FF7417]/10 text-[#FF7417] flex items-center justify-center font-bold">
-                      <Calendar className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white">Prioritized 30-Day Profile Improvement Plan</h4>
-                      <p className="text-xs text-slate-400">Step-by-step roadmap to maximize recruiter visibility and outreach</p>
-                    </div>
-                  </div>
-                  {expandedSections.actionPlan ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                </button>
-
-                {expandedSections.actionPlan && (
-                  <div className="p-6 border-t border-[#282834] space-y-4 text-xs text-slate-300">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {analysisResult.target_role_alignment.prioritized_30_day_plan.map((week) => (
-                        <div
-                          key={week.week}
-                          className="p-4 rounded-xl bg-[#0B0B0E] border border-[#282834] space-y-3 flex flex-col justify-between"
-                        >
-                          <div>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#1E1E26] text-[#FF7417] font-bold">
-                              WEEK {week.week}
-                            </span>
-                            <h6 className="text-sm font-bold text-white mt-2">{week.focus_title}</h6>
-                            <ul className="mt-3 space-y-2 text-slate-300">
-                              {week.action_items.map((item, idx) => (
-                                <li key={idx} className="flex items-start gap-1.5">
-                                  <span className="text-[#F04452] font-bold">•</span>
-                                  <span>{item}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Advisory Disclaimer Banner */}
-            <div className="p-5 rounded-2xl bg-[#141419] border border-[#282834] text-xs text-slate-400 leading-relaxed space-y-1">
-              <p className="font-bold text-slate-300 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-[#FF7417]" /> Advisory Evaluation Notice
-              </p>
-              <p>{analysisResult.disclaimer}</p>
-            </div>
-          </div>
+          <AnalysisDashboard
+            result={analysisResult}
+            onNewAnalysis={() => {
+              setAnalysisResult(null);
+              setErrorMessage(null);
+            }}
+          />
         )}
       </div>
     </div>
