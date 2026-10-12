@@ -33,6 +33,12 @@ class AnalysisHistory(Base, TimestampMixin):
         default="completed",
         index=True,
     )
+    analysis_type: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="resume",
+        index=True,
+    )
     overall_score: Mapped[Optional[int]] = mapped_column(
         Integer,
         nullable=True,

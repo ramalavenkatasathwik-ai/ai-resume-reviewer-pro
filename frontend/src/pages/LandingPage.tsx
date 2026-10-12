@@ -51,11 +51,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
           <Link
+            to="/linkedin"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-[#C91432] via-[#F04452] to-[#FF7417] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all focus:ring-4 focus:ring-orange-200"
+          >
+            <Sparkles className="w-4 h-4 text-white" />
+            LinkedIn Profile Analyzer
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
             to="/dashboard"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 text-white font-semibold text-sm shadow-md hover:bg-indigo-700 hover:shadow-lg transition-all focus:ring-4 focus:ring-indigo-200"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-900 text-white font-semibold text-sm shadow-sm hover:bg-slate-800 transition-all focus:ring-4 focus:ring-slate-300"
           >
             Launch Dashboard
-            <ArrowRight className="w-4 h-4" />
           </Link>
           <Link
             to="/settings"

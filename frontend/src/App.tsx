@@ -5,6 +5,8 @@ import { Footer } from '@/components/Footer';
 import { LandingPage } from '@/pages/LandingPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { LinkedInAnalyzerPage } from '@/pages/LinkedInAnalyzerPage';
+import { CustomCursor } from '@/components/CustomCursor';
 import { useHealthCheck } from '@/hooks/useHealthCheck';
 
 export const App: React.FC = () => {
@@ -13,6 +15,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
+      <CustomCursor />
       <Navbar
         status={status}
         serviceName={data?.service}
@@ -34,6 +37,7 @@ export const App: React.FC = () => {
             }
           />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/linkedin" element={<LinkedInAnalyzerPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </main>

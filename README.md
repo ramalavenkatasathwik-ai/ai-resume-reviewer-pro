@@ -71,11 +71,11 @@ ai-resume-reviewer-pro/
 │
 ├── backend/                      # FastAPI Python Application
 │   ├── app/
-│   │   ├── api/
 │   │   │   ├── routes_health.py  # GET /api/health
 │   │   │   ├── routes_models.py  # GET /api/models
 │   │   │   ├── routes_keys.py    # POST /api/keys/validate
 │   │   │   ├── routes_analysis.py# POST /api/analyze
+│   │   │   ├── routes_linkedin.py# POST /api/linkedin/analyze-url, analyze-pdf, analyze-text
 │   │   │   └── router.py         # Router aggregation
 │   │   ├── core/
 │   │   │   ├── config.py         # Pydantic Settings & model allowlist
@@ -85,15 +85,18 @@ ai-resume-reviewer-pro/
 │   │   │   ├── database.py       # Engine & SessionLocal factory
 │   │   │   └── base.py           # DeclarativeBase & TimestampMixin
 │   │   ├── models/
-│   │   │   └── analysis.py       # AnalysisHistory SQLAlchemy model
+│   │   │   └── analysis.py       # AnalysisHistory SQLAlchemy model (resume & linkedin)
 │   │   ├── schemas/
 │   │   │   ├── analysis.py       # AnalysisResult & CandidateInformation
+│   │   │   ├── linkedin.py       # LinkedInAnalysisResult & 10 section score schemas
 │   │   │   ├── models.py         # ModelsListResponse & ModelInfo
 │   │   │   ├── keys.py           # KeyValidationRequest & Response
 │   │   │   └── errors.py         # Standardized ErrorResponse
 │   │   ├── services/
 │   │   │   ├── gemini_service.py # Google GenAI SDK integration & retries
 │   │   │   ├── resume_service.py # In-memory PDF validation & extraction
+│   │   │   ├── linkedin_service.py # LinkedIn profile evaluation & scoring
+│   │   │   ├── linkedin_url_service.py # Secure URL probing & authwall handling
 │   │   │   ├── analysis_history_service.py # Isolated DB data access
 │   │   │   └── health.py         # Health service
 │   │   └── main.py               # Application factory & CORS

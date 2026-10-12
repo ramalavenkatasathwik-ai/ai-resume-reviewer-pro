@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { FileText, LayoutDashboard, Settings as SettingsIcon } from 'lucide-react';
+import { FileText, LayoutDashboard, Settings as SettingsIcon, Globe } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ConnectionStatus } from '@/types/api';
 
@@ -44,6 +44,10 @@ export const Navbar: React.FC<NavbarProps> = ({ status, serviceName, onRefresh }
               <NavLink to="/dashboard" className={navLinkClass}>
                 <LayoutDashboard className="w-4 h-4" />
                 Dashboard
+              </NavLink>
+              <NavLink to="/linkedin" className={navLinkClass}>
+                <Globe className="w-4 h-4 text-[#FF7417]" />
+                LinkedIn Analyzer
               </NavLink>
               <NavLink to="/settings" className={navLinkClass}>
                 <SettingsIcon className="w-4 h-4" />

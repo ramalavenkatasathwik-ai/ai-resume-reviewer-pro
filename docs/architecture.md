@@ -131,3 +131,29 @@ The application enforces a server-side allowlist of verified generally available
 - **CORS Hardening**:
   - In production, wildcard `*` origins are strictly forbidden and logged as security alerts.
   - Permitted origins must match explicit trusted hostnames.
+
+---
+
+## 7. LinkedIn Profile Analyzer Architecture
+
+The LinkedIn Profile Analyzer module adds role-benchmarking intelligence across personal LinkedIn profiles, supporting three distinct ingestion modalities and an evidence-based scoring engine:
+
+### 7.1 Ingestion Modalities
+1. **Mode 1: LinkedIn URL (`POST /api/linkedin/analyze-url`)**:
+   - Strict syntax, domain, and path validation (`linkedin.com/in/<slug>`). Non-profile or external domains are rejected immediately.
+   - Probes public URL without session cookies or illegal scraping techniques. If LinkedIn's authwall or anti-scraping walls (HTTP 999/403/login redirect) restrict member content, it analyzes available public metadata, computes partial coverage, explains the access limitation honestly, and prompts the user to use the PDF export for full analysis.
+2. **Mode 2: Official LinkedIn PDF Export (`POST /api/linkedin/analyze-pdf`)**:
+   - Validates official LinkedIn-generated "Save to PDF" documents in-memory.
+   - Rejects encrypted, empty, non-PDF, or corrupted files with clear user feedback.
+   - Provides 100% full coverage of private profile sections without risking account credentials.
+3. **Mode 3: Fallback Pasted Text (`POST /api/linkedin/analyze-text`)**:
+   - Allows users to paste raw profile text (headline, about, roles, skills) as an accessible alternative.
+
+### 7.2 Scoring & Coverage Engine
+- Evaluates 10 core standard profile sections (Headline, About, Experience, Skills, Education, Projects, Certifications, Keyword Optimization, Completeness, Target Role Alignment) with individual 0-100 scores.
+- **Evidence-Based Scoring Rule**: Scores reflect only verifiable evidence present in the input. Inaccessible sections are marked as unavailable and excluded from quality scoring rather than unfairly penalized with a 0 score. Profile Completeness reflects overall presence of standard LinkedIn sections.
+- **Target Role Alignment**: Benchmarks demonstrated competencies against user-selected roles (e.g. AI Developer, Data Analyst, Engineers) and produces a prioritized 30-day week-by-week action plan.
+
+### 7.3 Data Segregation
+- Analysis records are stored in `analysis_history` with `analysis_type="linkedin"` (distinguishing them from `analysis_type="resume"`).
+

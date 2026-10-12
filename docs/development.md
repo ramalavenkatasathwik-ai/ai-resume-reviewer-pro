@@ -224,14 +224,54 @@ pytest -m integration -v
 
 ---
 
-## 7. Frontend Development
+---
+
+## 7. LinkedIn Profile Analyzer API Endpoints
+
+### 7.1 Analyze LinkedIn Profile URL
+```bash
+curl -X POST "http://localhost:8000/api/linkedin/analyze-url" \
+  -H "Content-Type: application/json" \
+  -H "X-Gemini-API-Key: AIzaSyYourGeminiApiKey" \
+  -d '{
+    "url": "https://www.linkedin.com/in/username",
+    "target_role": "AI Developer",
+    "model": "gemini-2.5-flash"
+  }'
+```
+
+### 7.2 Analyze LinkedIn PDF Export
+```bash
+curl -X POST "http://localhost:8000/api/linkedin/analyze-pdf" \
+  -H "X-Gemini-API-Key: AIzaSyYourGeminiApiKey" \
+  -F "file=@Profile.pdf;type=application/pdf" \
+  -F "target_role=AI Developer" \
+  -F "model=gemini-2.5-flash"
+```
+
+### 7.3 Analyze Pasted Profile Text
+```bash
+curl -X POST "http://localhost:8000/api/linkedin/analyze-text" \
+  -H "Content-Type: application/json" \
+  -H "X-Gemini-API-Key: AIzaSyYourGeminiApiKey" \
+  -d '{
+    "profile_text": "Experienced Senior AI Engineer with extensive experience in LLMs...",
+    "target_role": "AI Developer"
+  }'
+```
+
+---
+
+## 8. Frontend Development
 
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-- Frontend application runs at: `http://localhost:5173`
+- Home Landing Page: `http://localhost:5173`
+- LinkedIn Profile Analyzer: `http://localhost:5173/linkedin`
+- Dashboard: `http://localhost:5173/dashboard`
+- Settings: `http://localhost:5173/settings`
 - Vitest test suite: `npm run test`
-- Code linter: `npm run lint`
 - Production bundle build: `npm run build`

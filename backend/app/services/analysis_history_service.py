@@ -14,6 +14,7 @@ class AnalysisHistoryService:
         filename: str,
         target_role: str,
         status: str = "completed",
+        analysis_type: str = "resume",
         overall_score: Optional[int] = None,
         ats_score: Optional[int] = None,
         result_json: Optional[Dict[str, Any]] = None,
@@ -23,6 +24,7 @@ class AnalysisHistoryService:
             original_filename=filename,
             target_role=target_role,
             status=status,
+            analysis_type=analysis_type,
             overall_score=overall_score,
             ats_score=ats_score,
             result_json=result_json,
@@ -43,12 +45,11 @@ class AnalysisHistoryService:
         db: Session,
         limit: int = 20,
         offset: int = 0,
+        analysis_type: Optional[str] = None,
     ) -> List[AnalysisHistory]:
         """Lists historical review records ordered by creation date descending."""
-        statement = (
-            select(AnalysisHistory)
-            .order_by(AnalysisHistory.created_at.desc())
-            .offset(offset)
-            .limit(limit)
-        )
+        statement = select(AnalysisHistory).order_by(AnalysisHistory.created_at.desc())
+        if analysis_type:
+            statement = statement.where(AnalysisHistory.analysis_type == analysis_type)
+        statement = statement.offset(offset).limit(limit)
         return list(db.scalars(statement).all())

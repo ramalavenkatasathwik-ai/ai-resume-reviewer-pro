@@ -95,6 +95,19 @@ def test_db_session() -> Generator[Session, None, None]:
         Base.metadata.drop_all(bind=engine)
 
 
+@pytest.fixture(autouse=True)
+def override_get_db(test_db_session: Session) -> Generator[None, None, None]:
+    """Automatically overrides get_db dependency in all route handlers with in-memory SQLite."""
+    from app.database.database import get_db
+
+    def _get_test_db():
+        yield test_db_session
+
+    app.dependency_overrides[get_db] = _get_test_db
+    yield
+    app.dependency_overrides.pop(get_db, None)
+
+
 @pytest.fixture
 def mock_analysis_dict() -> dict:
     """Returns a sample valid analysis result dictionary matching AnalysisResult schema."""
