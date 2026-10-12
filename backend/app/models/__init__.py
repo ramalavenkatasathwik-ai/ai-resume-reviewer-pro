@@ -1,4 +1,4 @@
-from app.database.session import Base
-from app.models.base import TimestampMixin
+from app.database.base import Base, TimestampMixin
+from app.models.analysis import AnalysisHistory
 
-__all__ = ["Base", "TimestampMixin"]
+__all__ = ["Base", "TimestampMixin", "AnalysisHistory"]

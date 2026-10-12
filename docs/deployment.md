@@ -1,6 +1,6 @@
 # AI Resume Reviewer Pro — Production Deployment Plan
 
-This document details the production deployment strategy, cloud topology, security hardening, and operational standards.
+This document details the production deployment architecture, security hardening standards, database migration pipelines, and operational monitoring.
 
 ---
 
@@ -12,76 +12,72 @@ flowchart LR
     CDN["Global CDN / Edge Cache\n(Cloudflare / AWS CloudFront)"]
     ALB["Application Load Balancer\n(TLS 1.3 Termination)"]
     
-    subgraph K8s ["Compute Cluster (EKS / GKE / ECS)"]
+    subgraph K8s ["Compute Cluster (EKS / GKE / Cloud Run)"]
         FrontendCluster["Frontend Pods\n(Nginx Serving React SPA)"]
-        BackendCluster["Backend Pods\n(FastAPI / Uvicorn ASGI Cluster)"]
+        BackendCluster["Backend Pods\n(FastAPI ASGI Workers)"]
     end
     
     subgraph DataPlane ["Managed Data Layer"]
         RDS[("PostgreSQL Multi-AZ\n(AWS RDS / GCP Cloud SQL)\nSSL / Encryption at Rest")]
-        Pooler["PgBouncer Connection Pooler"]
+        RedisCluster[("Redis Cluster (ElastiCache / MemoryStore)\nRate Limiting & Abuse Prevention")]
     end
     
     Users -->|HTTPS| CDN
     CDN -->|Static Assets| FrontendCluster
     CDN -->|Dynamic /api/*| ALB
     ALB --> BackendCluster
-    BackendCluster --> Pooler
-    Pooler --> RDS
+    BackendCluster --> RedisCluster
+    BackendCluster --> RDS
 ```
 
 ---
 
-## 2. Infrastructure Specification
+## 2. Infrastructure & Service Hardening
 
-### 2.1 Managed Database (PostgreSQL)
-- **Engine**: PostgreSQL 16+ on managed service (AWS Aurora/RDS, Google Cloud SQL, or Neon).
-- **Security**:
-  - Encrypted at rest using customer-managed KMS keys.
-  - Strict TLS requirement (`sslmode=require`).
-  - Restricted to private VPC subnets with no public IP exposure.
-- **Connection Management**:
-  - Connection pooling handled via PgBouncer or AWS RDS Proxy.
-- **Reliability**:
-  - Multi-AZ replication with automated daily snapshots and 30-day point-in-time recovery (PITR).
+### 2.1 Managed PostgreSQL 16
+- **Storage Encryption**: KMS customer-managed key encryption at rest.
+- **Network Isolation**: Accessible exclusively through private VPC subnets with strict security groups.
+- **Connection Security**: Enforced TLS 1.3 (`sslmode=require`).
+- **Connection Pooling**: Handled via PgBouncer or AWS RDS Proxy (`pool_pre_ping=True`, `pool_size=10`).
+- **Automated Backup**: Multi-AZ standby replica with continuous archiving and 30-day point-in-time recovery (PITR).
 
-### 2.2 Backend Application (FastAPI)
-- **Packaging**: Container image built via multi-stage Dockerfile based on `python:3.12-slim`.
-- **Runtime Configuration**:
-  - Uvicorn workers configured according to CPU allocation: `(2 x $NUM_CORES) + 1`.
-  - Memory bounds and restart policies enforced.
-- **Secrets Management**:
-  - Cloud secret managers (AWS Secrets Manager, GCP Secret Manager, or HashiCorp Vault) injected as runtime environment variables.
-  - **Zero Key Storage**: No master Gemini key is configured on backend instances; user BYOK keys are received ephemerally in request headers.
+### 2.2 Redis Rate Limiting & Abuse Protection
+- **Multi-Instance Quotas**: Redis cluster tracking IP quotas for endpoints (`POST /api/analyze`, `POST /api/keys/validate`).
+- **In-Memory Fallback**: If Redis connectivity degrades, Slowapi falls back gracefully to in-memory window buffers without halting application traffic.
 
-### 2.3 Frontend Application (React SPA)
-- **Distribution**: Static asset compilation deployed to Edge Storage (AWS S3 + CloudFront / Vercel / Cloudflare Pages).
-- **Security Headers**:
-  - Content-Security-Policy (CSP) restricting outbound connections.
-  - Strict-Transport-Security (`HSTS` max-age=31536000).
-  - `X-Frame-Options: DENY` and `X-Content-Type-Options: nosniff`.
-- **Compression**: Brotli and Gzip pre-compression with immutable cache headers for hashed bundles (`/assets/*`).
+### 2.3 Backend API Hardening
+- **Zero Secrets Persistence**:
+  - No master Gemini API keys are configured on backend servers.
+  - Ephemeral user keys are processed exclusively in RAM during the active request lifecycle and immediately discarded.
+- **CORS Protection**:
+  - In production, wildcard CORS (`*`) is explicitly prohibited. Only registered frontend production domains are whitelisted.
+- **Upload Restrictions**:
+  - Max upload size is strictly capped at `MAX_UPLOAD_SIZE_MB=10`.
+  - All uploads are inspected in-memory with magic byte verification (`%PDF-`) and structural parsing before passing to AI orchestration.
 
 ---
 
-## 3. CI/CD Deployment Pipeline
+## 3. Database Migration Release Pipeline
 
-1. **Continuous Integration**:
-   - Every pull request runs the complete CI matrix (`.github/workflows/ci.yml`):
-     - Python 3.12 Pytest suite
-     - Frontend ESLint, Prettier, and Vitest test suites
-     - TypeScript compiler check (`tsc --noEmit`)
-     - Docker image build verification
-2. **Automated Migration Execution**:
-   - Database migrations (`alembic upgrade head`) execute in an isolated pre-deployment job prior to traffic shifting.
-3. **Zero-Downtime Rolling Deployment**:
-   - Kubernetes rolling update or ECS Blue/Green deployment ensuring that new containers satisfy `/api/health` probes before retirement of legacy instances.
+Database schema migrations are managed through Alembic and must execute in an isolated pre-traffic deployment step:
+
+```mermaid
+flowchart LR
+    CI["GitHub Actions CI Build"] --> Test["Automated Tests & Linting"]
+    Test --> ReleaseGate{"Release Trigger"}
+    ReleaseGate --> Migrations["Run: alembic upgrade head\n(Pre-Deployment Job)"]
+    Migrations --> Rollout["Rolling Pod Update / Traffic Shift"]
+    Rollout --> HealthProbe["Probe: GET /api/health"]
+```
+
+1. **Pre-Traffic Execution**: Migrations run as a Kubernetes `Job` or release task before new application pods receive incoming traffic.
+2. **Backward Compatibility**: Migrations must maintain backward compatibility with running pods during blue-green or rolling deployments.
+3. **Rollback Procedure**: Each migration script contains an auditable `downgrade()` implementation for automated rollback if deployment verification fails.
 
 ---
 
-## 4. Monitoring, Logging, and Observability
+## 4. Monitoring, Probes & Observability
 
-- **Liveness & Readiness Probes**: Kubernetes or container orchestrator monitors `GET /api/health` every 10 seconds.
-- **Structured JSON Logging**: Application logs emitted as structured JSON to stdout, ingested by Datadog / OpenTelemetry / CloudWatch.
-- **Error Tracking**: Sentry configured for real-time unhandled exception telemetry on backend and frontend clients.
-- **Uptime Alerts**: Synthetics querying `/api/health` with automated PagerDuty/Slack escalations.
+- **Liveness & Readiness Probes**: Orchestrator probes `GET /api/health` every 10 seconds.
+- **Secret Redaction in Logs**: `SecretMaskingFilter` ensures no Gemini API keys, authorization tokens, or sensitive headers are written to CloudWatch, Datadog, or Sentry.
+- **Rate Limit Alerts**: Monitor 429 status response rates in Prometheus/Grafana to detect potential DDoS or abusive scraping patterns.

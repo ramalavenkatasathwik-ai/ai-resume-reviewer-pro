@@ -1,65 +1,31 @@
 # AI Resume Reviewer Pro — Developer Guide
 
-This guide covers local setup, tooling, testing, and day-to-day development workflows.
+This guide covers local environment setup, PostgreSQL database operations, Alembic migrations, testing procedures, and API usage.
 
 ---
 
 ## 1. Prerequisites
 
-Ensure you have installed:
 - **Python**: Version 3.12 or higher
 - **Node.js**: Version 20 LTS or higher (`npm` included)
-- **Git**: Installed and available in your PATH
-- **Docker & Docker Compose**: (Optional for local hybrid mode, required for full containerized stack)
+- **Git**: Installed and available in PATH
+- **Docker & Docker Compose**: (Required for containerized database and Redis)
 
 ---
 
-## 2. Repository Setup
+## 2. Environment Configuration
 
-Clone and initialize the repository:
-
+### 2.1 Backend Environment Setup
+Copy the environment example template:
 ```bash
-git clone <repository-url>
-cd ai-resume-reviewer-pro
-```
-
-Verify that `.env` files are ignored:
-```bash
-git status --ignored
-```
-
----
-
-## 3. Backend Development Setup
-
-### 3.1 Virtual Environment
-From the project root:
-
-```bash
-cd backend
-python -m venv .venv
-
 # On Linux / macOS:
-source .venv/bin/activate
+cp backend/.env.example backend/.env
 
 # On Windows (PowerShell):
-.venv\Scripts\Activate.ps1
+Copy-Item backend\.env.example backend\.env
 ```
 
-### 3.2 Install Dependencies
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-### 3.3 Configure Local Environment
-Copy the example environment template:
-```bash
-cp .env.example .env
-```
-*(On Windows: `Copy-Item .env.example .env`)*
-
-Configure variables in `.env` as appropriate:
+Ensure variables are set:
 ```env
 APP_NAME=ai-resume-reviewer-api
 APP_ENV=development
@@ -68,95 +34,204 @@ PORT=8000
 HOST=0.0.0.0
 DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/resume_reviewer
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
-GEMINI_MODEL=gemini-3.8-flash
+GEMINI_MODEL=gemini-2.5-flash
+MAX_UPLOAD_SIZE_MB=10
+RATE_LIMIT_PER_MINUTE=60
+RATE_LIMIT_ANALYZE_PER_MINUTE=10
+REDIS_URL=
 ```
 
-> **Note on BYOK**: Do NOT add any `GEMINI_API_KEY` to `.env`. This project enforces Bring Your Own Key architecture.
+> **BYOK Security Rule**: Never add a `GEMINI_API_KEY` to `.env` or application source code. All requests require client-provided keys in the `X-Gemini-API-Key` header.
 
-### 3.4 Database Migrations (Alembic)
-To apply database migrations:
+---
+
+## 3. Database & Alembic Migrations
+
+### 3.1 Running PostgreSQL & Redis with Docker Compose
+To run only the database and cache services locally:
 ```bash
+docker compose up -d postgres redis
+```
+
+### 3.2 Running Alembic Migrations
+Alembic migrations are configured relative to the repository.
+
+Apply all migrations to head:
+```bash
+# From root directory:
+.\backend\.venv\Scripts\alembic.exe -c backend\alembic.ini upgrade head
+
+# Or from backend directory:
+cd backend
 alembic upgrade head
 ```
 
-To generate a new migration revision:
+Revert the most recent migration:
 ```bash
-alembic revision --autogenerate -m "create_initial_models"
+alembic downgrade -1
 ```
 
-### 3.5 Run Backend Server
+Generate a new migration revision:
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-- API Base: `http://localhost:8000`
-- Interactive OpenAPI Docs: `http://localhost:8000/docs`
-- Health Endpoint: `http://localhost:8000/api/health`
-
-### 3.6 Run Backend Tests
-```bash
-pytest -v
+alembic revision --autogenerate -m "describe_change"
 ```
 
 ---
 
-## 4. Frontend Development Setup
+## 4. Running the Backend Application
 
-### 4.1 Install Node Packages
-From the `frontend` folder:
+Activate your virtual environment and start the Uvicorn ASGI server:
+
+```bash
+# Windows PowerShell:
+.\backend\.venv\Scripts\Activate.ps1
+cd backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# macOS / Linux:
+source backend/.venv/bin/activate
+cd backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+- API Base: `http://localhost:8000`
+- Interactive Swagger UI: `http://localhost:8000/docs`
+- Health Endpoint: `http://localhost:8000/api/health`
+- Supported Models: `http://localhost:8000/api/models`
+
+---
+
+## 5. API Endpoints Reference
+
+### 5.1 `GET /api/health`
+Probes application and service availability.
+- **Headers**: None
+- **Response**:
+  ```json
+  {
+    "status": "healthy",
+    "service": "ai-resume-reviewer-api"
+  }
+  ```
+
+### 5.2 `GET /api/models`
+Returns the server-side allowlist of supported Gemini models.
+- **Headers**: None
+- **Response**:
+  ```json
+  {
+    "models": [
+      {
+        "id": "gemini-2.5-flash",
+        "name": "Gemini 2.5 Flash",
+        "description": "Latest flagship Flash model with enhanced reasoning and high-fidelity structured output.",
+        "recommended": true,
+        "is_default": true,
+        "context_window": "1M tokens"
+      },
+      {
+        "id": "gemini-2.0-flash",
+        "name": "Gemini 2.0 Flash",
+        "description": "Ultra-fast multimodal model engineered for high-throughput, low-latency evaluation.",
+        "recommended": false,
+        "is_default": false,
+        "context_window": "1M tokens"
+      }
+    ],
+    "default_model": "gemini-2.5-flash"
+  }
+  ```
+
+### 5.3 `POST /api/keys/validate`
+Validates a user's Gemini API key by making a lightweight probe request.
+- **Required Header**: `X-Gemini-API-Key: <your_gemini_api_key>`
+- **Body (optional JSON)**:
+  ```json
+  {
+    "model": "gemini-2.5-flash"
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "valid": true,
+    "model": "gemini-2.5-flash",
+    "message": "Successfully validated API key with gemini-2.5-flash."
+  }
+  ```
+
+### 5.4 `POST /api/analyze`
+Uploads a resume PDF in-memory and evaluates it against a target role.
+- **Required Header**: `X-Gemini-API-Key: <your_gemini_api_key>`
+- **Multipart Form Data**:
+  - `file`: Resume file (must be `.pdf`, max 10MB)
+  - `target_role`: Desired job title (e.g. `Senior Cloud Engineer`)
+  - `model` *(optional)*: Chosen Gemini model (must be in allowed list)
+- **Response**:
+  ```json
+  {
+    "candidate_information": {
+      "name": "Candidate Name",
+      "email": "user@example.com",
+      "location": "City, Country"
+    },
+    "overall_score": 85,
+    "ats_score": 90,
+    "skills_score": 82,
+    "content_score": 86,
+    "experience_score": 84,
+    "formatting_score": 92,
+    "professional_summary": "Executive summary...",
+    "strengths": ["Strong architectural background..."],
+    "weaknesses": ["Lacks explicit cloud migration metrics..."],
+    "missing_skills": ["Terraform", "Kafka"],
+    "ats_keywords": ["FastAPI", "Kubernetes", "PostgreSQL"],
+    "grammar_issues": [],
+    "formatting_issues": [],
+    "recommended_skills": ["Event-driven architectures"],
+    "recommended_certifications": ["AWS Solutions Architect Professional"],
+    "recommended_courses": ["Advanced Distributed Systems"],
+    "interview_questions": ["Explain how you scaled your database connection pool."],
+    "career_suggestions": ["Target Lead or Staff Backend roles."],
+    "final_assessment": "Strong candidate well positioned for senior positions.",
+    "target_role": "Senior Cloud Engineer",
+    "model_used": "gemini-2.5-flash",
+    "disclaimer": "Scores and observations are AI-generated estimates based on provided resume evidence and do not guarantee ATS passage or employment decisions."
+  }
+  ```
+
+---
+
+## 6. Running the Test Suite
+
+Execute the complete backend test suite:
+```bash
+# From repository root:
+.\backend\.venv\Scripts\pytest.exe -v -c backend\pytest.ini backend\tests
+
+# From backend folder:
+cd backend
+pytest -v
+```
+
+### Live Gemini Integration Tests (Optional)
+To run live network calls against Google Gemini using a test key:
+```bash
+$env:GEMINI_INTEGRATION_TEST_KEY = "AIzaSyD-YourRealTestKey"
+pytest -m integration -v
+```
+*(Unit tests never require a real key and mock all external API calls by default).*
+
+---
+
+## 7. Frontend Development
 
 ```bash
 cd frontend
 npm install
-```
-
-### 4.2 Configure Local Environment
-```bash
-cp .env.example .env
-```
-*(On Windows: `Copy-Item .env.example .env`)*
-
-Ensure `VITE_API_URL` points to your backend instance:
-```env
-VITE_API_URL=http://localhost:8000
-```
-
-### 4.3 Run Frontend Dev Server
-```bash
 npm run dev
 ```
-- Frontend application will launch at: `http://localhost:5173`
-
-### 4.4 Run Frontend Tests & Linter
-```bash
-# Run Vitest test suite
-npm run test
-
-# Run ESLint
-npm run lint
-
-# Format with Prettier
-npm run format
-
-# Production build check
-npm run build
-```
-
----
-
-## 5. Docker Development Workflow
-
-To launch the complete containerized stack (PostgreSQL + FastAPI + React SPA with Nginx reverse proxy):
-
-```bash
-docker compose up --build
-```
-
-### Services Access
-- **Frontend SPA**: `http://localhost:3000` (or `http://localhost:5173`)
-- **Backend API**: `http://localhost:8000`
-- **PostgreSQL**: `localhost:5432`
-
-To shut down containers and tear down volumes:
-```bash
-docker compose down -v
-```
+- Frontend application runs at: `http://localhost:5173`
+- Vitest test suite: `npm run test`
+- Code linter: `npm run lint`
+- Production bundle build: `npm run build`

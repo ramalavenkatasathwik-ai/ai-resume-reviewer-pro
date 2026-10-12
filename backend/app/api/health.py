@@ -1,18 +1,4 @@
-from fastapi import APIRouter, status
+"""Backward-compatibility module re-exporting router from routes_health."""
+from app.api.routes_health import router
 
-from app.schemas.health import HealthResponse
-from app.services.health import check_health
-
-router = APIRouter(tags=["Health"])
-
-
-@router.get(
-    "/health",
-    response_model=HealthResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Application Health Check",
-    description="Returns current operational status of the service.",
-)
-async def get_health() -> HealthResponse:
-    """Endpoint for uptime monitoring and connectivity verification."""
-    return check_health()
+__all__ = ["router"]

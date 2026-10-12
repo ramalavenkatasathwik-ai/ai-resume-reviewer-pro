@@ -22,6 +22,20 @@ services:
     networks:
       - resume_network
 
+  redis:
+    image: redis:7-alpine
+    container_name: resume_reviewer_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - resume_network
+
   backend:
     build:
       context: ./backend
@@ -36,11 +50,16 @@ services:
       PORT: "8000"
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-resume_reviewer}
       CORS_ORIGINS: http://localhost:5173,http://localhost:3000,http://localhost,http://127.0.0.1:5173,http://127.0.0.1:3000
-      GEMINI_MODEL: gemini-3.8-flash
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      MAX_UPLOAD_SIZE_MB: "10"
+      RATE_LIMIT_PER_MINUTE: "60"
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
