@@ -33,7 +33,7 @@ export const SectionAccordion: React.FC<SectionAccordionProps> = ({
     if (!icon) return null;
     if (
       typeof icon === 'function' ||
-      (typeof icon === 'object' && icon !== null && 'render' in (icon as any))
+      (typeof icon === 'object' && icon !== null && 'render' in (icon as unknown as Record<string, unknown>))
     ) {
       const IconComponent = icon as React.ElementType;
       return <IconComponent className="w-4 h-4" />;

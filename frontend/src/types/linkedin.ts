@@ -164,26 +164,54 @@ export interface LinkedInSectionScores {
 
 export interface LinkedInAnalysisResult {
   id: string;
+  status?: string;
   input_type: 'url' | 'pdf' | 'text';
   profile_url?: string | null;
+  normalized_profile_url?: string | null;
   target_role: string;
   model_used: string;
   created_at: string;
   profile_identity: ProfileIdentity;
+  profile?: ProfileIdentity;
   available_sections: string[];
   unavailable_sections: string[];
+  coverage_percentage?: number;
   coverage_information: CoverageInformation;
   overall_score: ScoreDetail;
   section_scores: LinkedInSectionScores;
+  strengths?: string[];
+  weaknesses?: string[];
   headline_analysis: HeadlineAnalysis;
   about_analysis: AboutAnalysis;
   experience_analysis: ExperienceAnalysis;
   education_analysis: EducationAnalysis;
   skills_analysis: SkillsAnalysis;
-  project_analysis: ProjectAnalysis;
-  additional_sections: AdditionalSectionsAnalysis;
+  project_analysis?: ProjectAnalysis;
+  projects_analysis?: ProjectAnalysis;
+  additional_sections?: AdditionalSectionsAnalysis;
+  certifications_analysis?: string[];
   keyword_analysis: KeywordAnalysis;
   target_role_alignment: TargetRoleAlignment;
+  recommended_headline?: string | null;
+  recommended_about?: string | null;
+  action_plan?: PlanWeek[];
   limitations: string[];
   disclaimer: string;
+}
+
+export interface LinkedInUrlRequest {
+  linkedin_url?: string;
+  url?: string;
+  target_role: string;
+  model?: string;
+  profile_text?: string;
+  fallback_text?: string;
+}
+
+export interface LinkedInUnavailableDetail {
+  error: string;
+  message: string;
+  limitations?: string[];
+  suggested_actions?: string[];
+  normalized_profile_url?: string;
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   FileText,
   Sparkles,
@@ -71,9 +72,9 @@ export const DashboardPage: React.FC = () => {
       .then((data) => {
         if (data.models && data.models.length > 0) {
           setAvailableModels(data.models);
-          if (!selectedModel || !data.models.includes(selectedModel)) {
-            setSelectedModel(data.default_model || data.models[0]);
-          }
+          setSelectedModel((curr) =>
+            !curr || !data.models.includes(curr) ? data.default_model || data.models[0] : curr
+          );
         }
       })
       .catch(() => {
@@ -128,12 +129,17 @@ export const DashboardPage: React.FC = () => {
       );
       setResult(data);
       setToastMessage('Resume analyzed successfully!');
-    } catch (err: any) {
-      const msg =
-        err.response?.data?.detail ||
-        err.response?.data?.message ||
-        err.message ||
-        'Failed to analyze resume. Please check your API key and file format.';
+    } catch (err: unknown) {
+      let msg = 'Failed to analyze resume. Please check your API key and file format.';
+      if (axios.isAxiosError(err)) {
+        msg =
+          err.response?.data?.detail ||
+          err.response?.data?.message ||
+          err.message ||
+          msg;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
       setError(msg);
     } finally {
       setIsLoading(false);

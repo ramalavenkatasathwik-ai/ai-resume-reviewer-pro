@@ -43,7 +43,7 @@ export const resumeService = {
     limit: number = 50,
     offset: number = 0
   ): Promise<AnalysisHistoryItem[]> {
-    const params: Record<string, any> = { limit, offset };
+    const params: Record<string, string | number> = { limit, offset };
     if (analysisType && analysisType !== 'all') {
       params.analysis_type = analysisType;
     }

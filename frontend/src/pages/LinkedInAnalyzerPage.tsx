@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import {
   Globe,
   FileText,
@@ -65,6 +66,13 @@ export const LinkedInAnalyzerPage: React.FC = () => {
   const [fallbackUrlText, setFallbackUrlText] = useState('');
   const [showFallbackAccordion, setShowFallbackAccordion] = useState(false);
 
+  // URL Validation state
+  const [urlValidationStatus, setUrlValidationStatus] = useState<{
+    valid?: boolean;
+    message?: string;
+    normalizedUrl?: string;
+  } | null>(null);
+
   // Key validation state
   const [isValidatingKey, setIsValidatingKey] = useState(false);
   const [keyValidationStatus, setKeyValidationStatus] = useState<{
@@ -77,6 +85,12 @@ export const LinkedInAnalyzerPage: React.FC = () => {
   const [progressStep, setProgressStep] = useState(1);
   const [progressMessage, setProgressMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [unavailableData, setUnavailableData] = useState<{
+    message: string;
+    limitations?: string[];
+    suggestedActions?: string[];
+    normalizedUrl?: string;
+  } | null>(null);
   const [analysisResult, setAnalysisResult] = useState<LinkedInAnalysisResult | null>(null);
 
   // Accordion toggle states
@@ -111,10 +125,10 @@ export const LinkedInAnalyzerPage: React.FC = () => {
     let timer: NodeJS.Timeout;
     if (isLoading) {
       setProgressStep(1);
-      setProgressMessage('Validating profile input and probing accessibility...');
+      setProgressMessage('Validating profile input and checking data providers...');
       timer = setTimeout(() => {
         setProgressStep(2);
-        setProgressMessage('Extracting credentials, work history, and role competencies...');
+        setProgressMessage('Extracting verified credentials, history, and competencies...');
         timer = setTimeout(() => {
           setProgressStep(3);
           setProgressMessage(`Benchmarking profile evidence against ${targetRole} standards...`);
@@ -130,12 +144,31 @@ export const LinkedInAnalyzerPage: React.FC = () => {
 
   // URL validity check
   const isUrlValid = (url: string) => {
-    const cleaned = url.trim().toLowerCase();
-    return (
-      cleaned.includes('linkedin.com/in/') &&
-      !cleaned.includes('/jobs') &&
-      !cleaned.includes('/company')
-    );
+    return linkedinService.validateProfileUrl(url).valid;
+  };
+
+  const handleValidateUrlClick = () => {
+    if (!urlInput.trim()) {
+      setUrlValidationStatus({
+        valid: false,
+        message: 'Please enter a LinkedIn profile URL.',
+      });
+      return;
+    }
+    const val = linkedinService.validateProfileUrl(urlInput);
+    if (val.valid) {
+      setUrlValidationStatus({
+        valid: true,
+        message: `Valid LinkedIn profile URL (${val.normalizedUrl})`,
+        normalizedUrl: val.normalizedUrl,
+      });
+      setErrorMessage(null);
+    } else {
+      setUrlValidationStatus({
+        valid: false,
+        message: val.error || 'Invalid LinkedIn URL format.',
+      });
+    }
   };
 
   const handleKeyProbe = async () => {
@@ -145,8 +178,13 @@ export const LinkedInAnalyzerPage: React.FC = () => {
     try {
       const res = await linkedinService.validateKey(apiKey.trim(), selectedModel);
       setKeyValidationStatus({ valid: res.valid, message: res.message });
-    } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'Key validation failed';
+    } catch (err: unknown) {
+      let msg = 'Key validation failed.';
+      if (axios.isAxiosError(err)) {
+        msg = err.response?.data?.message || err.message || msg;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
       setKeyValidationStatus({ valid: false, message: msg });
     } finally {
       setIsValidatingKey(false);
@@ -191,22 +229,30 @@ export const LinkedInAnalyzerPage: React.FC = () => {
     }
 
     setErrorMessage(null);
+    setUnavailableData(null);
     setIsLoading(true);
 
     try {
       let result: LinkedInAnalysisResult;
 
       if (activeTab === 'url') {
-        if (!urlInput.trim() || !isUrlValid(urlInput)) {
-          setErrorMessage('Please provide a valid LinkedIn personal profile URL (e.g., https://www.linkedin.com/in/username).');
+        const val = linkedinService.validateProfileUrl(urlInput);
+        if (!val.valid) {
+          const err =
+            val.error ||
+            'Please provide a valid LinkedIn personal profile URL (e.g., https://www.linkedin.com/in/username).';
+          setErrorMessage(err);
+          setUrlValidationStatus({ valid: false, message: err });
           setIsLoading(false);
           return;
         }
         result = await linkedinService.analyzeUrl(
           {
-            url: urlInput.trim(),
+            linkedin_url: val.normalizedUrl || urlInput.trim(),
+            url: val.normalizedUrl || urlInput.trim(),
             target_role: effectiveRole,
             model: selectedModel,
+            profile_text: fallbackUrlText.trim() || undefined,
             fallback_text: fallbackUrlText.trim() || undefined,
           },
           apiKey.trim()
@@ -242,14 +288,35 @@ export const LinkedInAnalyzerPage: React.FC = () => {
       }
 
       setAnalysisResult(result);
-    } catch (err: any) {
-      const detail = err.response?.data?.detail;
-      const msg =
-        (typeof detail === 'object' ? detail.message : detail) ||
-        err.response?.data?.message ||
-        err.message ||
-        'An unexpected error occurred during profile analysis. Please check your credentials and retry.';
-      setErrorMessage(msg);
+      setUnavailableData(null);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const status = err.response?.status;
+        const detail = err.response?.data?.detail;
+        if (status === 422 || detail?.error === 'PROFILE_DATA_UNAVAILABLE') {
+          setUnavailableData({
+            message:
+              (typeof detail === 'object' ? detail?.message : detail) ||
+              'A URL alone did not provide the profile content due to LinkedIn access controls.',
+            limitations: (typeof detail === 'object' ? detail?.limitations : []) || [],
+            suggestedActions: (typeof detail === 'object' ? detail?.suggested_actions : []) || [],
+            normalizedUrl: (typeof detail === 'object' ? detail?.normalized_profile_url : undefined) || urlInput,
+          });
+          setAnalysisResult(null);
+          return;
+        }
+
+        const msg =
+          (typeof detail === 'object' ? detail?.message : detail) ||
+          err.response?.data?.message ||
+          err.message ||
+          'An unexpected error occurred during profile analysis. Please check your credentials and retry.';
+        setErrorMessage(msg);
+      } else if (err instanceof Error) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage('An unexpected error occurred during profile analysis.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -366,7 +433,7 @@ export const LinkedInAnalyzerPage: React.FC = () => {
                 <div className="space-y-4">
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                      <label htmlFor="linkedin-url-input" className="text-xs font-bold uppercase tracking-wider text-slate-300">
                         Public LinkedIn Profile URL
                       </label>
                       {urlInput && (
@@ -387,22 +454,56 @@ export const LinkedInAnalyzerPage: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                        <Globe className="w-4 h-4" />
+                    <div className="flex flex-col sm:flex-row gap-2.5">
+                      <div className="relative flex-1">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                          <Globe className="w-4 h-4" />
+                        </div>
+                        <input
+                          id="linkedin-url-input"
+                          type="url"
+                          value={urlInput}
+                          onChange={(e) => {
+                            setUrlInput(e.target.value);
+                            setUrlValidationStatus(null);
+                          }}
+                          placeholder="https://www.linkedin.com/in/your-profile-slug"
+                          className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0B0B0E] border border-[#282834] text-sm text-white placeholder-slate-600 focus:outline-none focus:border-[#FF7417] focus:ring-1 focus:ring-[#FF7417] font-mono"
+                        />
                       </div>
-                      <input
-                        type="url"
-                        value={urlInput}
-                        onChange={(e) => setUrlInput(e.target.value)}
-                        placeholder="https://www.linkedin.com/in/your-profile-slug"
-                        className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0B0B0E] border border-[#282834] text-sm text-white placeholder-slate-600 focus:outline-none focus:border-[#FF7417] focus:ring-1 focus:ring-[#FF7417] font-mono"
-                      />
+                      <button
+                        type="button"
+                        onClick={handleValidateUrlClick}
+                        data-testid="validate-url-button"
+                        className="px-5 py-3 rounded-xl bg-[#1E1E26] hover:bg-[#282834] border border-[#282834] text-xs font-bold text-slate-200 hover:text-white transition-all flex items-center justify-center gap-2 shrink-0"
+                      >
+                        <Search className="w-3.5 h-3.5 text-[#FF7417]" />
+                        <span>Validate URL</span>
+                      </button>
                     </div>
+
+                    {urlValidationStatus && (
+                      <div
+                        data-testid="url-validation-feedback"
+                        className={`mt-2 p-2.5 rounded-xl border text-xs font-medium flex items-center gap-2 ${
+                          urlValidationStatus.valid
+                            ? 'bg-emerald-950/30 border-emerald-800/50 text-emerald-300'
+                            : 'bg-rose-950/30 border-rose-800/50 text-rose-300'
+                        }`}
+                      >
+                        {urlValidationStatus.valid ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 text-[#F04452] shrink-0" />
+                        )}
+                        <span>{urlValidationStatus.message}</span>
+                      </div>
+                    )}
+
                     <p className="mt-2 text-xs text-slate-400 flex items-start gap-1.5">
                       <Info className="w-3.5 h-3.5 text-[#FF7417] mt-0.5 shrink-0" />
                       <span>
-                        Note: Because LinkedIn enforces authentication walls for full member profiles, public URL probing analyzes all publicly accessible metadata. For 100% full coverage of private sections, use the <strong>LinkedIn PDF</strong> tab.
+                        Note: Because LinkedIn enforces authentication walls for member profiles, direct URL access requires approved API permissions. If direct access is blocked, you can easily paste your profile text below or upload an official <strong>LinkedIn PDF</strong> export.
                       </span>
                     </p>
                   </div>
@@ -415,16 +516,17 @@ export const LinkedInAnalyzerPage: React.FC = () => {
                       className="text-xs font-semibold text-[#FF7417] hover:text-[#FFA05C] flex items-center gap-1 transition-colors"
                     >
                       {showFallbackAccordion ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                      Optional: Add supplement profile text
+                      Optional: Add profile text / fallback content
                     </button>
                     {showFallbackAccordion && (
                       <div className="mt-2">
                         <textarea
-                          rows={3}
+                          id="fallback-text-input"
+                          rows={4}
                           value={fallbackUrlText}
                           onChange={(e) => setFallbackUrlText(e.target.value)}
-                          placeholder="Paste any additional experience bullets, about section, or skills to combine with the URL analysis..."
-                          className="w-full p-3 rounded-xl bg-[#0B0B0E] border border-[#282834] text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#FF7417]"
+                          placeholder="Paste any headline, About summary, work experience, or skills to combine with the URL analysis..."
+                          className="w-full p-3 rounded-xl bg-[#0B0B0E] border border-[#282834] text-xs text-white placeholder-slate-600 focus:outline-none focus:border-[#FF7417] font-mono leading-relaxed"
                         />
                       </div>
                     )}
@@ -672,6 +774,113 @@ export const LinkedInAnalyzerPage: React.FC = () => {
                 </div>
               )}
 
+              {/* Unavailable Profile Data State (HTTP 422) */}
+              {unavailableData && (
+                <div
+                  data-testid="unavailable-data-panel"
+                  className="bg-[#141419] rounded-2xl border-2 border-[#C91432]/70 shadow-[0_0_30px_rgba(201,20,50,0.25)] p-6 sm:p-8 space-y-6 animate-fade-in"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-[#C91432]/20 border border-[#C91432] text-[#F04452] flex items-center justify-center shrink-0">
+                      <AlertCircle className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#C91432]/30 text-[#F04452] border border-[#C91432]/50">
+                          Profile Inaccessible via URL
+                        </span>
+                        <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#1E1E26] text-slate-400 border border-[#282834]">
+                          Ethical BYOK Compliance
+                        </span>
+                      </div>
+                      <h3 className="text-base sm:text-lg font-bold text-white">
+                        A URL alone did not provide the profile content
+                      </h3>
+                      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                        {unavailableData.message}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Ethical Zero-Hallucination Policy Guarantee */}
+                  <div className="bg-[#1C1C23] border border-[#303038] rounded-xl p-4 flex items-center gap-3 text-xs text-slate-300">
+                    <ShieldCheck className="w-5 h-5 text-[#FF7417] shrink-0" />
+                    <div>
+                      <span className="font-bold text-[#F7F7FA]">Zero Fabricated Scores: </span>
+                      <span>
+                        In accordance with our strict AI ethics policy, we never generate fake scores or hallucinate missing candidate data when profile content is unavailable.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Limitations if provided */}
+                  {unavailableData.limitations && unavailableData.limitations.length > 0 && (
+                    <div className="p-3.5 rounded-xl bg-[#0B0B0E] border border-[#303038] space-y-1.5 text-xs">
+                      <p className="font-bold text-slate-300 flex items-center gap-1.5">
+                        <Info className="w-3.5 h-3.5 text-[#FF7417]" /> Detected Access Limitations:
+                      </p>
+                      <ul className="list-disc list-inside space-y-0.5 text-slate-400 pl-1">
+                        {unavailableData.limitations.map((lim, idx) => (
+                          <li key={idx}>{lim}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Fallback Action Choices */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                    {/* Fallback 1: Switch to PDF Upload */}
+                    <div className="bg-[#0B0B0E] border border-[#303038] rounded-xl p-5 space-y-3 flex flex-col justify-between hover:border-[#FF7417] transition-all">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-[#FF7417]">
+                          <UploadCloud className="w-5 h-5" />
+                          <h4 className="text-sm font-bold text-white">Option 1: Upload LinkedIn PDF (Recommended)</h4>
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                          On LinkedIn, click <strong>More &gt; Save to PDF</strong> to download your full official profile with all experience bullets and skills.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('pdf');
+                          setUnavailableData(null);
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#C91432] to-[#FF7417] text-white text-xs font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                      >
+                        <span>Switch to PDF Upload</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Fallback 2: Paste Profile Text */}
+                    <div className="bg-[#0B0B0E] border border-[#303038] rounded-xl p-5 space-y-3 flex flex-col justify-between hover:border-[#FF7417] transition-all">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-[#FF7417]">
+                          <Type className="w-5 h-5" />
+                          <h4 className="text-sm font-bold text-white">Option 2: Paste Profile Text</h4>
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                          Paste your headline, About summary, experience roles, and skills directly to perform the comprehensive analysis.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowFallbackAccordion(true);
+                          const el = document.getElementById('fallback-text-input');
+                          el?.focus();
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl bg-[#1E1E26] hover:bg-[#282834] border border-[#303038] text-white text-xs font-bold transition-all flex items-center justify-center gap-2"
+                      >
+                        <span>Paste Profile Text</span>
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Action Button & Loading Progress */}
               <div className="pt-4 border-t border-[#282834]">
                 {isLoading ? (
@@ -695,6 +904,7 @@ export const LinkedInAnalyzerPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleAnalyze}
+                    data-testid="analyze-profile-button"
                     className="w-full py-4 rounded-xl bg-gradient-to-r from-[#C91432] via-[#F04452] to-[#FF7417] text-white font-extrabold text-sm shadow-[0_0_25px_rgba(240,68,82,0.35)] hover:shadow-[0_0_35px_rgba(255,116,23,0.5)] transition-all flex items-center justify-center gap-2"
                   >
                     <span>Analyze LinkedIn Profile</span>

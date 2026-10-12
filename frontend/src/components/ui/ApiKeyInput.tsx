@@ -44,12 +44,17 @@ export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({
         valid: response.data.valid,
         message: response.data.message || 'Key successfully validated.',
       });
-    } catch (err: any) {
-      const msg =
-        err.response?.data?.detail?.message ||
-        err.response?.data?.message ||
-        err.message ||
-        'Key validation failed. Please check that the key is active.';
+    } catch (err: unknown) {
+      let msg = 'Key validation failed. Please check that the key is active.';
+      if (axios.isAxiosError(err)) {
+        msg =
+          err.response?.data?.detail?.message ||
+          err.response?.data?.message ||
+          err.message ||
+          msg;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
       setValidationResult({ valid: false, message: msg });
     } finally {
       setIsValidating(false);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -30,6 +30,11 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   const activeValue = selectedModel !== undefined ? selectedModel : (value || 'gemini-2.5-flash');
   const availableModels = externalModels && externalModels.length > 0 ? externalModels : internalModels;
 
+  const activeValueRef = useRef(activeValue);
+  activeValueRef.current = activeValue;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
   useEffect(() => {
     if (!externalModels || externalModels.length === 0) {
       axios
@@ -38,8 +43,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           if (res.data?.models && res.data.models.length > 0) {
             const ids = res.data.models.map((m) => m.id);
             setInternalModels(ids);
-            if (!activeValue && res.data.default_model) {
-              onChange(res.data.default_model);
+            if (!activeValueRef.current && res.data.default_model) {
+              onChangeRef.current(res.data.default_model);
             }
           }
         })

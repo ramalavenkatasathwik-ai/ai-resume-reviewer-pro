@@ -46,9 +46,7 @@ export const SettingsPage: React.FC = () => {
       .then((res) => {
         if (res.models && res.models.length > 0) {
           setAvailableModels(res.models);
-          if (!selectedModel) {
-            setSelectedModel(res.default_model || res.models[0]);
-          }
+          setSelectedModel((curr) => curr || res.default_model || res.models[0]);
         }
       })
       .catch(() => {

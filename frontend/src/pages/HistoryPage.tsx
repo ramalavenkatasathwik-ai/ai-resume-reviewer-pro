@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Link } from 'react-router-dom';
 import {
   History as HistoryIcon,
@@ -21,26 +22,28 @@ export const HistoryPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchHistory = async (type: string = filter) => {
+  const fetchHistory = React.useCallback(async (type: string = filter) => {
     setIsLoading(true);
     setError(null);
     try {
       const records = await resumeService.getHistory(type, 50, 0);
       setHistoryItems(records);
-    } catch (err: any) {
-      setError(
-        err.response?.data?.detail ||
-        err.message ||
-        'Failed to load analysis history from database.'
-      );
+    } catch (err: unknown) {
+      let msg = 'Failed to load analysis history from database.';
+      if (axios.isAxiosError(err)) {
+        msg = err.response?.data?.detail || err.message || msg;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [filter]);
 
   useEffect(() => {
     fetchHistory(filter);
-  }, [filter]);
+  }, [fetchHistory, filter]);
 
   // Statistics calculation
   const totalCount = historyItems.length;

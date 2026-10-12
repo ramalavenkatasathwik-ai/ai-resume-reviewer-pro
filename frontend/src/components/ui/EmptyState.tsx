@@ -17,7 +17,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     if (!icon) return null;
     if (
       typeof icon === 'function' ||
-      (typeof icon === 'object' && icon !== null && 'render' in (icon as any))
+      (typeof icon === 'object' && icon !== null && 'render' in (icon as unknown as Record<string, unknown>))
     ) {
       const IconComponent = icon as React.ElementType;
       return <IconComponent className="w-6 h-6" />;
