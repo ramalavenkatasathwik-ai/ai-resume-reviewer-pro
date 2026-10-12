@@ -166,6 +166,8 @@ export interface LinkedInAnalysisResult {
   id: string;
   status?: string;
   input_type: 'url' | 'pdf' | 'text';
+  original_filename?: string | null;
+  extraction_method?: string | null;
   profile_url?: string | null;
   normalized_profile_url?: string | null;
   target_role: string;
@@ -194,6 +196,9 @@ export interface LinkedInAnalysisResult {
   target_role_alignment: TargetRoleAlignment;
   recommended_headline?: string | null;
   recommended_about?: string | null;
+  recommended_skills?: string[];
+  recommended_projects?: string[];
+  recommended_certifications?: string[];
   action_plan?: PlanWeek[];
   limitations: string[];
   disclaimer: string;

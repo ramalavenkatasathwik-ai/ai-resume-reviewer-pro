@@ -19,6 +19,7 @@ from app.services.linkedin_profile_provider import (
 )
 from app.services.linkedin_service import LinkedInService
 from app.services.linkedin_url_service import LinkedInUrlService
+from app.services.linkedin_pdf_service import LinkedInPdfService
 from app.services.resume_service import ResumeService
 
 settings = get_settings()
@@ -127,15 +128,24 @@ async def analyze_linkedin_url(
 async def analyze_linkedin_pdf(
     request: Request,
     file: UploadFile = File(..., description="LinkedIn-generated PDF export (max 10MB)"),
-    target_role: str = Form(..., description="Target job title / role"),
+    target_role: str = Form("AI Developer", description="Target job title / role"),
     model: Optional[str] = Form(None, description="Optional chosen Gemini model"),
     profile_url: Optional[str] = Form(None, description="Optional profile URL"),
     api_key: str = Depends(get_gemini_api_key),
     db: Session = Depends(get_db),
 ) -> LinkedInAnalysisResult:
     """Validates the PDF, extracts content in-memory, and evaluates with Google Gemini."""
+    clean_target_role = (target_role or "AI Developer").strip() or "AI Developer"
+
     # 1. Validate PDF and extract text in-memory
-    _pdf_bytes, profile_text, _page_count = await ResumeService.validate_and_extract_pdf(file)
+    (
+        pdf_bytes,
+        profile_text,
+        page_count,
+        extraction_method,
+        detected_sections,
+        unavailable_sections,
+    ) = await LinkedInPdfService.validate_and_extract_linkedin_pdf(file)
 
     # 2. Normalize optional profile URL if provided
     normalized_url = None
@@ -149,22 +159,30 @@ async def analyze_linkedin_pdf(
     result = await LinkedInService.analyze_profile(
         api_key=api_key,
         profile_content=profile_text,
-        target_role=target_role,
+        target_role=clean_target_role,
         input_type="pdf",
         profile_url=normalized_url,
         model_name=model,
+        original_filename=file.filename or "linkedin_profile.pdf",
+        extraction_method=extraction_method,
+        pdf_bytes=pdf_bytes,
     )
 
     # 4. Record to database
     try:
+        ats_score_val = (
+            result.target_role_alignment.alignment_score
+            if result.target_role_alignment
+            else result.section_scores.target_role_alignment.score
+        )
         AnalysisHistoryService.record_analysis(
             db=db,
             filename=file.filename or "linkedin_profile.pdf",
-            target_role=target_role,
+            target_role=clean_target_role,
             status="completed",
             analysis_type="linkedin",
             overall_score=result.overall_score.score,
-            ats_score=result.target_role_alignment.alignment_score,
+            ats_score=ats_score_val,
             result_json=result.model_dump(),
         )
     except Exception as e:

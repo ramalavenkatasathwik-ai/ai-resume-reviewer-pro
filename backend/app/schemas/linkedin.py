@@ -189,6 +189,8 @@ class LinkedInAnalysisResult(BaseModel):
     """Complete root response payload for a LinkedIn profile evaluation."""
     status: str = Field("completed", description="Execution status: completed")
     input_type: str = Field(..., description="Method used: 'url', 'pdf', or 'text'")
+    original_filename: Optional[str] = Field(None, description="Original filename of uploaded document if applicable")
+    extraction_method: Optional[str] = Field("embedded_text", description="Method used to extract profile content: 'embedded_text' or 'gemini_multimodal_pdf'")
     normalized_profile_url: Optional[str] = Field(None, description="Normalized HTTPS profile URL")
     profile_url: Optional[str] = Field(None, description="Profile URL alias for backward compatibility")
     target_role: str = Field(..., description="Target job title / role benchmarked")
@@ -207,6 +209,9 @@ class LinkedInAnalysisResult(BaseModel):
     keyword_analysis: KeywordAnalysis = Field(..., description="Recruiter keyword search optimization")
     recommended_headline: Optional[str] = Field(None, description="Primary recommended headline rewrite")
     recommended_about: Optional[str] = Field(None, description="Recommended rewritten About section")
+    recommended_skills: List[str] = Field(default_factory=list, description="Target role skill recommendations")
+    recommended_projects: List[str] = Field(default_factory=list, description="Target role project recommendations")
+    recommended_certifications: List[str] = Field(default_factory=list, description="Target role certification recommendations")
     action_plan: List[PlanWeek] = Field(default_factory=list, description="Prioritized 30-day action plan")
     available_sections: List[str] = Field(default_factory=list, description="Profile sections with verifiable evidence")
     unavailable_sections: List[str] = Field(default_factory=list, description="Profile sections absent from input")

@@ -55,6 +55,9 @@ class LinkedInService:
         profile_url: Optional[str] = None,
         model_name: Optional[str] = None,
         extra_limitations: Optional[List[str]] = None,
+        original_filename: Optional[str] = None,
+        extraction_method: Optional[str] = "embedded_text",
+        pdf_bytes: Optional[bytes] = None,
     ) -> LinkedInAnalysisResult:
         """Executes a structured LinkedIn profile review against Google Gemini."""
         model = GeminiService.resolve_model(model_name)
@@ -248,6 +251,13 @@ JSON Output Schema Specification:
 }}
 """
 
+        contents_payload: Any = prompt
+        if extraction_method == "gemini_multimodal_pdf" and pdf_bytes:
+            contents_payload = [
+                prompt,
+                types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+            ]
+
         max_retries = 3
         retry_delay = 1.0
 
@@ -255,7 +265,7 @@ JSON Output Schema Specification:
             try:
                 response = client.models.generate_content(
                     model=model,
-                    contents=prompt,
+                    contents=contents_payload,
                     config=types.GenerateContentConfig(
                         temperature=0.2,
                         response_mime_type="application/json",
@@ -269,6 +279,8 @@ JSON Output Schema Specification:
                     profile_url=profile_url,
                     model_used=model,
                     extra_limitations=extra_limitations or [],
+                    original_filename=original_filename,
+                    extraction_method=extraction_method or "embedded_text",
                 )
 
             except genai_errors.APIError as e:
@@ -340,6 +352,8 @@ JSON Output Schema Specification:
         profile_url: Optional[str],
         model_used: str,
         extra_limitations: List[str],
+        original_filename: Optional[str] = None,
+        extraction_method: str = "embedded_text",
     ) -> LinkedInAnalysisResult:
         """Parses model JSON output, validates against schema, and computes coverage."""
         cleaned = raw_text.strip()
@@ -374,6 +388,8 @@ JSON Output Schema Specification:
         data["id"] = record_id
         data["status"] = "completed"
         data["input_type"] = input_type
+        data["original_filename"] = original_filename
+        data["extraction_method"] = extraction_method or "embedded_text"
         data["normalized_profile_url"] = profile_url
         data["profile_url"] = profile_url
         data["target_role"] = target_role
@@ -408,6 +424,28 @@ JSON Output Schema Specification:
             aa = data["about_analysis"]
             if isinstance(aa, dict):
                 data["recommended_about"] = aa.get("suggested_rewritten_about")
+
+        # Root level recommendations for skills, projects, certifications
+        if not data.get("recommended_skills"):
+            skills_data = data.get("skills_analysis")
+            if isinstance(skills_data, dict):
+                data["recommended_skills"] = (
+                    skills_data.get("suggested_skill_prioritization")
+                    or skills_data.get("missing_or_weakly_evidenced_skills")
+                    or []
+                )
+            if not data.get("recommended_skills") and isinstance(tra, dict):
+                data["recommended_skills"] = tra.get("critical_skill_gaps", [])
+
+        if not data.get("recommended_projects"):
+            if isinstance(tra, dict):
+                data["recommended_projects"] = tra.get("recommended_projects", [])
+
+        if not data.get("recommended_certifications"):
+            if isinstance(tra, dict):
+                data["recommended_certifications"] = tra.get("recommended_certifications", [])
+            if not data.get("recommended_certifications"):
+                data["recommended_certifications"] = data.get("certifications_analysis") or []
 
         # Synthesize strengths & weaknesses if not at root
         if not data.get("strengths"):
