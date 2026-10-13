@@ -1,10 +1,13 @@
 import uuid
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, TYPE_CHECKING
 
-from sqlalchemy import String, Integer, JSON, CheckConstraint, Index
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, Integer, JSON, CheckConstraint, Index, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base, TimestampMixin
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class AnalysisHistory(Base, TimestampMixin):
@@ -16,6 +19,12 @@ class AnalysisHistory(Base, TimestampMixin):
         String(36),
         primary_key=True,
         default=lambda: str(uuid.uuid4()),
+        index=True,
+    )
+    user_id: Mapped[Optional[str]] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     original_filename: Mapped[str] = mapped_column(
@@ -50,6 +59,11 @@ class AnalysisHistory(Base, TimestampMixin):
     result_json: Mapped[Optional[Dict[str, Any]]] = mapped_column(
         JSON,
         nullable=True,
+    )
+
+    user: Mapped[Optional["User"]] = relationship(
+        "User",
+        back_populates="analyses",
     )
 
     __table_args__ = (

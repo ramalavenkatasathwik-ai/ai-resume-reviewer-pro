@@ -3,9 +3,10 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.core.security import get_gemini_api_key, limiter
+from app.core.security import get_gemini_api_key, limiter, get_optional_current_user
 from app.core.logging import logger
 from app.database.database import get_db
+from app.models.user import User
 from app.schemas.analysis import AnalysisResult
 from app.services.analysis_history_service import AnalysisHistoryService
 from app.services.gemini_service import GeminiService
@@ -28,6 +29,7 @@ async def analyze_resume(
     target_role: str = Form(..., description="Target job title / role for benchmark analysis"),
     model: Optional[str] = Form(None, description="Optional chosen Gemini model from supported allowlist"),
     api_key: str = Depends(get_gemini_api_key),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ) -> AnalysisResult:
     """Validates the PDF, extracts content in-memory, and evaluates it using Google Gemini."""
@@ -53,6 +55,7 @@ async def analyze_resume(
             overall_score=analysis_result.overall_score,
             ats_score=analysis_result.ats_score,
             result_json=analysis_result.model_dump(),
+            user_id=current_user.id if current_user else None,
         )
     except Exception as e:
         logger.warning("Failed to record resume analysis to DB: %s", type(e).__name__)
@@ -69,14 +72,20 @@ async def list_history(
     limit: int = 20,
     offset: int = 0,
     analysis_type: Optional[str] = None,
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
-    """Lists history records ordered by creation date descending."""
+    """Lists history records ordered by creation date descending with user isolation."""
+    user_id = current_user.id if current_user else None
+    only_unauthenticated = current_user is None
+
     records = AnalysisHistoryService.list_records(
         db=db,
         limit=limit,
         offset=offset,
         analysis_type=analysis_type,
+        user_id=user_id,
+        only_unauthenticated=only_unauthenticated,
     )
     return [
         {
@@ -91,4 +100,5 @@ async def list_history(
         }
         for r in records
     ]
+
 

@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.logging import logger
-from app.core.security import get_gemini_api_key, limiter
+from app.core.security import get_gemini_api_key, limiter, get_optional_current_user
 from app.database.database import get_db
+from app.models.user import User
 from app.schemas.linkedin import (
     LinkedInAnalysisResult,
     LinkedInUrlRequest,
@@ -39,6 +40,7 @@ async def analyze_linkedin_url(
     request: Request,
     payload: LinkedInUrlRequest,
     api_key: str = Depends(get_gemini_api_key),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ) -> LinkedInAnalysisResult:
     """Evaluates a public LinkedIn profile from URL using authorized providers without unauthorized scrapers."""
@@ -110,6 +112,7 @@ async def analyze_linkedin_url(
             overall_score=result.overall_score.score,
             ats_score=ats_score_val,
             result_json=result.model_dump(),
+            user_id=current_user.id if current_user else None,
         )
     except Exception as e:
         logger.warning("Failed to record LinkedIn URL analysis to DB: %s", type(e).__name__)
@@ -132,6 +135,7 @@ async def analyze_linkedin_pdf(
     model: Optional[str] = Form(None, description="Optional chosen Gemini model"),
     profile_url: Optional[str] = Form(None, description="Optional profile URL"),
     api_key: str = Depends(get_gemini_api_key),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ) -> LinkedInAnalysisResult:
     """Validates the PDF, extracts content in-memory, and evaluates with Google Gemini."""
@@ -184,6 +188,7 @@ async def analyze_linkedin_pdf(
             overall_score=result.overall_score.score,
             ats_score=ats_score_val,
             result_json=result.model_dump(),
+            user_id=current_user.id if current_user else None,
         )
     except Exception as e:
         logger.warning("Failed to record LinkedIn PDF analysis to DB: %s", type(e).__name__)
@@ -203,6 +208,7 @@ async def analyze_linkedin_text(
     request: Request,
     payload: LinkedInTextRequest,
     api_key: str = Depends(get_gemini_api_key),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db),
 ) -> LinkedInAnalysisResult:
     """Analyzes raw pasted profile text as an accessible fallback for incomplete PDFs or blocked URLs."""
@@ -243,6 +249,7 @@ async def analyze_linkedin_text(
             overall_score=result.overall_score.score,
             ats_score=result.target_role_alignment.alignment_score,
             result_json=result.model_dump(),
+            user_id=current_user.id if current_user else None,
         )
     except Exception as e:
         logger.warning("Failed to record LinkedIn text analysis to DB: %s", type(e).__name__)

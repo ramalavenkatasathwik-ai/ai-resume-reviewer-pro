@@ -1,8 +1,9 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { Menu, FileText, Linkedin, Settings, Sparkles } from 'lucide-react';
+import { NavLink, useLocation, Link } from 'react-router-dom';
+import { Menu, FileText, Linkedin, Settings, Sparkles, LogIn, LogOut } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ConnectionStatus } from '@/types/api';
+import { useAuth } from '@/context/AuthContext';
 
 interface TopbarProps {
   onOpenMobileSidebar: () => void;
@@ -18,6 +19,7 @@ export const Topbar: React.FC<TopbarProps> = ({
   onRefresh,
 }) => {
   const location = useLocation();
+  const { user, isAuthenticated, logout } = useAuth();
 
   const getPageTitle = () => {
     switch (location.pathname) {
@@ -33,6 +35,14 @@ export const Topbar: React.FC<TopbarProps> = ({
         return 'Reports';
       case '/settings':
         return 'Settings';
+      case '/login':
+        return 'Sign In';
+      case '/register':
+        return 'Create Account';
+      case '/forgot-password':
+        return 'Password Recovery';
+      case '/reset-password':
+        return 'Reset Password';
       default:
         return 'AI Resume & LinkedIn Analyzer Pro';
     }
@@ -92,7 +102,7 @@ export const Topbar: React.FC<TopbarProps> = ({
           </NavLink>
         </div>
 
-        {/* Right: Status Badge & Settings Shortcut */}
+        {/* Right: Status Badge & Auth State */}
         <div className="flex items-center gap-3">
           <StatusBadge
             status={status}
@@ -107,6 +117,41 @@ export const Topbar: React.FC<TopbarProps> = ({
           >
             <Settings className="w-4 h-4" />
           </NavLink>
+
+          {isAuthenticated && user ? (
+            <div className="flex items-center gap-2 pl-2 border-l border-[#303038]">
+              <NavLink
+                to="/settings"
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-[#1C1C23] hover:bg-[#25252E] border border-[#303038] text-xs font-medium text-[#F7F7FA] transition"
+                title={user.email}
+              >
+                <div className="w-5 h-5 rounded-full bg-primary-red/20 text-bright-red flex items-center justify-center font-bold text-[10px]">
+                  {(user.display_name || user.email)[0].toUpperCase()}
+                </div>
+                <span className="hidden sm:inline max-w-[120px] truncate">
+                  {user.display_name || user.email.split('@')[0]}
+                </span>
+              </NavLink>
+              <button
+                onClick={() => logout()}
+                aria-label="Sign Out"
+                title="Sign Out"
+                className="p-2 rounded-xl text-[#A1A1AA] hover:text-bright-red hover:bg-[#1C1C23] border border-[#303038] transition cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 pl-2 border-l border-[#303038]">
+              <Link
+                to="/login"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-red hover:bg-bright-red text-white text-xs font-semibold shadow transition"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </header>

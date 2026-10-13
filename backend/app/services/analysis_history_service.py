@@ -18,6 +18,7 @@ class AnalysisHistoryService:
         overall_score: Optional[int] = None,
         ats_score: Optional[int] = None,
         result_json: Optional[Dict[str, Any]] = None,
+        user_id: Optional[str] = None,
     ) -> AnalysisHistory:
         """Creates and commits an analysis history record in the database."""
         record = AnalysisHistory(
@@ -28,6 +29,7 @@ class AnalysisHistoryService:
             overall_score=overall_score,
             ats_score=ats_score,
             result_json=result_json,
+            user_id=user_id,
         )
         db.add(record)
         db.commit()
@@ -46,10 +48,18 @@ class AnalysisHistoryService:
         limit: int = 20,
         offset: int = 0,
         analysis_type: Optional[str] = None,
+        user_id: Optional[str] = None,
+        only_unauthenticated: bool = False,
     ) -> List[AnalysisHistory]:
         """Lists historical review records ordered by creation date descending."""
         statement = select(AnalysisHistory).order_by(AnalysisHistory.created_at.desc())
+        if user_id is not None:
+            statement = statement.where(AnalysisHistory.user_id == user_id)
+        elif only_unauthenticated:
+            statement = statement.where(AnalysisHistory.user_id.is_(None))
         if analysis_type:
             statement = statement.where(AnalysisHistory.analysis_type == analysis_type)
         statement = statement.offset(offset).limit(limit)
         return list(db.scalars(statement).all())
+
+

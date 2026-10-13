@@ -51,6 +51,23 @@ class Settings(BaseSettings):
     RATE_LIMIT_ANALYZE_PER_MINUTE: int = 10
     REDIS_URL: Optional[str] = None
 
+    # Authentication and Session Security
+    SECRET_KEY: str = "ai-resume-reviewer-pro-secret-key-development-minimum-32-chars-long"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    AUTH_COOKIE_NAME: str = "auth_token"
+    AUTH_COOKIE_SECURE: bool = False  # Set to True in production (HTTPS)
+    AUTH_COOKIE_SAMESITE: str = "lax"
+
+    # Password Reset & Email Configuration (SMTP)
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: Optional[int] = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM_EMAIL: str = "noreply@resume-reviewer.local"
+    SMTP_USE_TLS: bool = True
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 15
+
     # Official LinkedIn API settings (optional, enabled only when approved permissions are configured)
     LINKEDIN_CLIENT_ID: Optional[str] = None
     LINKEDIN_CLIENT_SECRET: Optional[str] = None
@@ -78,6 +95,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.APP_ENV.lower() == "production"
+
+    @property
+    def is_smtp_configured(self) -> bool:
+        return bool(self.SMTP_HOST and self.SMTP_PORT)
 
     @property
     def max_upload_size_bytes(self) -> int:
