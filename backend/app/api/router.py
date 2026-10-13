@@ -12,6 +12,7 @@ from app.api.routes_files import router as files_router
 from app.api.routes_job_match import router as job_match_router
 from app.api.routes_export import router as export_router
 from app.api.routes_email import router as email_router
+from app.api.routes_career_intelligence import router as career_intelligence_router
 
 api_router = APIRouter()
 
@@ -28,3 +29,4 @@ api_router.include_router(files_router)
 api_router.include_router(job_match_router)
 api_router.include_router(export_router)
 api_router.include_router(email_router)
+api_router.include_router(career_intelligence_router)

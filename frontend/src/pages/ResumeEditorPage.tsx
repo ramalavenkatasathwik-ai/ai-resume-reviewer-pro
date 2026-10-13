@@ -14,6 +14,7 @@ import {
   FileDown,
   FileText,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { resumeDocumentService } from '@/services/resumeDocumentService';
 import { exportService } from '@/services/exportService';
@@ -373,6 +374,17 @@ export const ResumeEditorPage: React.FC = () => {
           <SecondaryButton size="sm" onClick={handleOpenHistory} className="border-[#303038]">
             <History className="w-3.5 h-3.5 text-[#FF7417]" />
             <span className="hidden sm:inline">Versions</span>
+          </SecondaryButton>
+
+          {/* Career Intelligence Button */}
+          <SecondaryButton
+            size="sm"
+            onClick={() => navigate('/career')}
+            className="border-[#303038]"
+            title="Open AI Career Intelligence Suite"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-[#FF7417]" />
+            <span className="hidden md:inline">Career AI</span>
           </SecondaryButton>
 
           {/* Export PDF Button */}

@@ -68,6 +68,22 @@ def get_gemini_api_key(
     return clean_key
 
 
+def get_optional_gemini_api_key(
+    x_gemini_api_key: Optional[str] = Header(
+        None,
+        alias="X-Gemini-API-Key",
+        description="Optional user-provided Google Gemini API Key (BYOK)",
+    ),
+) -> Optional[str]:
+    """Dependency that extracts Gemini API key if present, returning None if omitted."""
+    if not x_gemini_api_key or not x_gemini_api_key.strip():
+        return None
+    clean_key = x_gemini_api_key.strip()
+    if "\n" in clean_key or "\r" in clean_key or len(clean_key) < 20 or len(clean_key) > 100:
+        return None
+    return clean_key
+
+
 def mask_api_key(key: str) -> str:
     """Safely masks an API key for safe UI hints (e.g. AIza...****), never exposing the actual key."""
     if not key or len(key) < 8:

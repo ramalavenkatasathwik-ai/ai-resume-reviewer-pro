@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.stored_file import StoredFile
     from app.models.job_match import JobMatchReport
     from app.models.email_log import EmailDeliveryLog
+    from app.models.career_intelligence import CareerRoadmap, MultiRoleComparison, CareerProjectRecommendation
 
 
 class User(Base, TimestampMixin):
@@ -74,6 +75,21 @@ class User(Base, TimestampMixin):
     )
     email_logs: Mapped[List["EmailDeliveryLog"]] = relationship(
         "EmailDeliveryLog",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    career_roadmaps: Mapped[List["CareerRoadmap"]] = relationship(
+        "CareerRoadmap",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    multi_role_comparisons: Mapped[List["MultiRoleComparison"]] = relationship(
+        "MultiRoleComparison",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    career_projects: Mapped[List["CareerProjectRecommendation"]] = relationship(
+        "CareerProjectRecommendation",
         back_populates="user",
         cascade="all, delete-orphan",
     )

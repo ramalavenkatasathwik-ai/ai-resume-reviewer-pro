@@ -38,6 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { to: '/dashboard', label: 'Resume Analyzer', icon: FileText },
     { to: '/linkedin', label: 'LinkedIn Analyzer', icon: Linkedin },
     { to: '/job-match', label: 'Job Match', icon: Briefcase },
+    { to: '/career', label: 'Career Intelligence', icon: Sparkles },
     { to: '/resumes', label: 'My Resumes', icon: Files },
     { to: '/reports', label: 'My Reports', icon: FileBarChart2 },
     { to: '/history', label: 'Analysis History', icon: History },

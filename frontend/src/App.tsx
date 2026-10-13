@@ -15,6 +15,7 @@ import { RegisterPage } from '@/pages/RegisterPage';
 import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
 import { JobMatchPage } from '@/pages/JobMatchPage';
+import { CareerIntelligencePage } from '@/pages/CareerIntelligencePage';
 import { useHealthCheck } from '@/hooks/useHealthCheck';
 
 export const App: React.FC = () => {
@@ -45,6 +46,7 @@ export const App: React.FC = () => {
           <Route path="/resume" element={<Navigate to="/dashboard" replace />} />
           <Route path="/linkedin" element={<LinkedInAnalyzerPage />} />
           <Route path="/job-match" element={<JobMatchPage />} />
+          <Route path="/career" element={<CareerIntelligencePage />} />
           <Route path="/resumes" element={<ResumesPage />} />
           <Route path="/resumes/:id" element={<ResumeEditorPage />} />
           <Route path="/history" element={<HistoryPage />} />
