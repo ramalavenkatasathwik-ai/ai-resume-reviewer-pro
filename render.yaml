@@ -1,4 +1,27 @@
 services:
+  # Frontend Static Site (React 18 + Vite SPA)
+  - type: web
+    name: ai-resume-reviewer-frontend
+    runtime: static
+    region: oregon
+    branch: main
+    buildCommand: cd frontend && npm install && npm run build
+    publishPath: frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    envVars:
+      - key: VITE_API_URL
+        value: https://ai-resume-reviewer-backend.onrender.com
+
   # Backend Web Service (FastAPI)
   - type: web
     name: ai-resume-reviewer-backend
@@ -25,7 +48,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: CORS_ORIGINS
-        sync: false
+        value: https://ai-resume-reviewer-frontend.onrender.com
       - key: MAX_UPLOAD_SIZE_MB
         value: "10"
       - key: GEMINI_MODEL
