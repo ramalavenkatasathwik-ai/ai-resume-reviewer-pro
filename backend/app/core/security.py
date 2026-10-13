@@ -187,3 +187,8 @@ def get_optional_current_user(request: Request, db: Session = Depends(get_db)) -
     user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
     return user
 
+
+# Convenience alias for active user dependency
+get_current_active_user = get_current_user
+
+

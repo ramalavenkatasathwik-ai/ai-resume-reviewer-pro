@@ -1,5 +1,17 @@
 from app.database.base import Base, TimestampMixin
-from app.models.analysis import AnalysisHistory
+from app.models.analysis import AnalysisHistory, AnalysisReport
 from app.models.user import User, PasswordResetToken
+from app.models.stored_file import StoredFile
+from app.models.resume import ResumeDocument, ResumeVersion
 
-__all__ = ["Base", "TimestampMixin", "AnalysisHistory", "User", "PasswordResetToken"]
+__all__ = [
+    "Base",
+    "TimestampMixin",
+    "AnalysisHistory",
+    "AnalysisReport",
+    "User",
+    "PasswordResetToken",
+    "StoredFile",
+    "ResumeDocument",
+    "ResumeVersion",
+]

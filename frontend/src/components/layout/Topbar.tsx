@@ -29,10 +29,12 @@ export const Topbar: React.FC<TopbarProps> = ({
         return 'Resume Analyzer';
       case '/linkedin':
         return 'LinkedIn Analyzer';
+      case '/resumes':
+        return 'My Resumes';
       case '/history':
         return 'Analysis History';
       case '/reports':
-        return 'Reports';
+        return 'My Reports';
       case '/settings':
         return 'Settings';
       case '/login':
@@ -44,6 +46,9 @@ export const Topbar: React.FC<TopbarProps> = ({
       case '/reset-password':
         return 'Reset Password';
       default:
+        if (location.pathname.startsWith('/resumes/')) {
+          return 'Resume Editor';
+        }
         return 'AI Resume & LinkedIn Analyzer Pro';
     }
   };

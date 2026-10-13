@@ -7,6 +7,8 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { LinkedInAnalyzerPage } from '@/pages/LinkedInAnalyzerPage';
 import { HistoryPage } from '@/pages/HistoryPage';
 import { ReportsPage } from '@/pages/ReportsPage';
+import { ResumesPage } from '@/pages/ResumesPage';
+import { ResumeEditorPage } from '@/pages/ResumeEditorPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
@@ -41,6 +43,8 @@ export const App: React.FC = () => {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/resume" element={<Navigate to="/dashboard" replace />} />
           <Route path="/linkedin" element={<LinkedInAnalyzerPage />} />
+          <Route path="/resumes" element={<ResumesPage />} />
+          <Route path="/resumes/:id" element={<ResumeEditorPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
@@ -56,4 +60,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-

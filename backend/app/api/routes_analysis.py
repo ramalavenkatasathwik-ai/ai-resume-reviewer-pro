@@ -56,6 +56,8 @@ async def analyze_resume(
             ats_score=analysis_result.ats_score,
             result_json=analysis_result.model_dump(),
             user_id=current_user.id if current_user else None,
+            source_type="pdf",
+            model_name=analysis_result.model_used or model or "gemini-2.5-flash",
         )
     except Exception as e:
         logger.warning("Failed to record resume analysis to DB: %s", type(e).__name__)

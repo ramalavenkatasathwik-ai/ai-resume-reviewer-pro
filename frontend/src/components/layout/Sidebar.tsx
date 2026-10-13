@@ -11,6 +11,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Sparkles,
+  Files,
 } from 'lucide-react';
 import { ConnectionStatus } from '@/types/api';
 
@@ -35,8 +36,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { to: '/', label: 'Overview', icon: Home, end: true },
     { to: '/dashboard', label: 'Resume Analyzer', icon: FileText },
     { to: '/linkedin', label: 'LinkedIn Analyzer', icon: Linkedin },
+    { to: '/resumes', label: 'My Resumes', icon: Files },
+    { to: '/reports', label: 'My Reports', icon: FileBarChart2 },
     { to: '/history', label: 'Analysis History', icon: History },
-    { to: '/reports', label: 'Reports', icon: FileBarChart2 },
     { to: '/settings', label: 'Settings', icon: SettingsIcon },
   ];
 

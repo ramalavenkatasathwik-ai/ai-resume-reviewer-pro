@@ -9,6 +9,8 @@ from app.database.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.analysis import AnalysisHistory
+    from app.models.resume import ResumeDocument
+    from app.models.stored_file import StoredFile
 
 
 class User(Base, TimestampMixin):
@@ -50,6 +52,16 @@ class User(Base, TimestampMixin):
     )
     reset_tokens: Mapped[List["PasswordResetToken"]] = relationship(
         "PasswordResetToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    resumes: Mapped[List["ResumeDocument"]] = relationship(
+        "ResumeDocument",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    stored_files: Mapped[List["StoredFile"]] = relationship(
+        "StoredFile",
         back_populates="user",
         cascade="all, delete-orphan",
     )

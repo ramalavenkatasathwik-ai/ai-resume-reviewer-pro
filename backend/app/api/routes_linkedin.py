@@ -113,6 +113,8 @@ async def analyze_linkedin_url(
             ats_score=ats_score_val,
             result_json=result.model_dump(),
             user_id=current_user.id if current_user else None,
+            source_type="url",
+            model_name=result.model_used or payload.model or "gemini-2.5-flash",
         )
     except Exception as e:
         logger.warning("Failed to record LinkedIn URL analysis to DB: %s", type(e).__name__)
@@ -189,6 +191,8 @@ async def analyze_linkedin_pdf(
             ats_score=ats_score_val,
             result_json=result.model_dump(),
             user_id=current_user.id if current_user else None,
+            source_type="pdf",
+            model_name=result.model_used or model or "gemini-2.5-flash",
         )
     except Exception as e:
         logger.warning("Failed to record LinkedIn PDF analysis to DB: %s", type(e).__name__)
@@ -250,6 +254,8 @@ async def analyze_linkedin_text(
             ats_score=result.target_role_alignment.alignment_score,
             result_json=result.model_dump(),
             user_id=current_user.id if current_user else None,
+            source_type="text",
+            model_name=result.model_used or payload.model or "gemini-2.5-flash",
         )
     except Exception as e:
         logger.warning("Failed to record LinkedIn text analysis to DB: %s", type(e).__name__)

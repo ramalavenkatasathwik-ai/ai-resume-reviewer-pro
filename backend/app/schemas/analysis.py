@@ -1,5 +1,6 @@
+from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class CandidateInformation(BaseModel):
@@ -121,3 +122,42 @@ class AnalysisResult(BaseModel):
         default="Scores and observations are AI-generated estimates based on provided resume evidence and do not guarantee ATS passage or employment decisions.",
         description="Legal and accuracy disclaimer",
     )
+
+
+class AnalysisReportSummary(BaseModel):
+    """Compact summary for analysis report history and listings."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    original_filename: str
+    filename: Optional[str] = None
+    source_type: str = "pdf"
+    analysis_type: str = "resume"
+    target_role: str
+    status: str
+    overall_score: Optional[int] = None
+    ats_score: Optional[int] = None
+    model_name: Optional[str] = None
+    created_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
+class AnalysisReportDetail(AnalysisReportSummary):
+    """Complete analysis report including evaluation JSON, tokens, and errors."""
+    result_json: Optional[Dict[str, Any]] = None
+    prompt_version: Optional[str] = None
+    token_usage: Optional[Dict[str, Any]] = None
+    estimated_cost: Optional[float] = None
+    error_category: Optional[str] = None
+    error_message: Optional[str] = None
+    stored_file_id: Optional[str] = None
+
+
+class AnalysisReportListResponse(BaseModel):
+    """Paginated response envelope for analysis reports."""
+    items: List[AnalysisReportSummary]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+

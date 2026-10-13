@@ -37,3 +37,11 @@ Thumbs.db
 *.swo
 .vscode/
 .idea/
+
+# Private Storage & Dumps
+backend/storage/private/*
+!backend/storage/private/.gitkeep
+storage/private/*
+!storage/private/.gitkeep
+*.dump
+
