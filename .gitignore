@@ -38,10 +38,23 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Private Storage & Dumps
+# Local Databases & Logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.dump
+*.dump.enc
+
+# Private Storage & Uploads
 backend/storage/private/*
 !backend/storage/private/.gitkeep
 storage/private/*
 !storage/private/.gitkeep
-*.dump
+uploads/
+private/
+
+# Frontend builds
+frontend/dist/
+frontend/dist-ssr/
 

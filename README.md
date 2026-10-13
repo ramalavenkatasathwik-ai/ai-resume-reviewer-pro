@@ -1,6 +1,6 @@
 # AI Resume Reviewer Pro
 
-[![CI](https://github.com/example/ai-resume-reviewer-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/example/ai-resume-reviewer-pro/actions/workflows/ci.yml)
+[![CI](https://github.com/ramalavenkatasathwik-ai/ai-resume-reviewer-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/ramalavenkatasathwik-ai/ai-resume-reviewer-pro/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.12+](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![FastAPI: 0.115+](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com/)
@@ -8,9 +8,9 @@
 [![TypeScript: 5.6](https://img.shields.io/badge/TypeScript-5.6-3178C6.svg)](https://www.typescriptlang.org/)
 [![Google GenAI SDK](https://img.shields.io/badge/Google_GenAI_SDK-Official-4285F4.svg)](https://github.com/googleapis/python-genai)
 
-**AI Resume Reviewer Pro** is a production-grade application for AI-powered resume analysis, ATS scoring heuristics, and career trajectory optimization built with FastAPI, React, PostgreSQL, and Google Gemini.
+**AI Resume Reviewer Pro** is an end-to-end, production-grade platform for AI-powered resume analysis, ATS scoring heuristics, LinkedIn profile benchmarking, job-description matching, multi-version resume drafting, editable document export (PDF/DOCX), and career intelligence built with FastAPI, React, PostgreSQL, and Google Gemini (BYOK).
 
-> **Phase 2 Milestone**: Production-oriented backend architecture, PostgreSQL database persistence layer with Alembic migrations, official Google GenAI SDK integration with Bring Your Own Key (BYOK) security, in-memory PDF validation, rate limiting, and an automated test suite.
+> **Production Release (Phases 1–12 Complete)**: Complete frontend & backend, PostgreSQL persistence with Alembic (revisions 001–008), Bring-Your-Own-Key (BYOK) privacy, full test suite (216 tests, 100% pass), code-split Vite bundle, WCAG 2.1 AA accessibility, and production deployment blueprints for Vercel and Render.
 
 ---
 
