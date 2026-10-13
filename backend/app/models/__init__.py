@@ -3,6 +3,7 @@ from app.models.analysis import AnalysisHistory, AnalysisReport
 from app.models.user import User, PasswordResetToken
 from app.models.stored_file import StoredFile
 from app.models.resume import ResumeDocument, ResumeVersion
+from app.models.job_match import JobMatchReport
 
 __all__ = [
     "Base",
@@ -14,4 +15,5 @@ __all__ = [
     "StoredFile",
     "ResumeDocument",
     "ResumeVersion",
+    "JobMatchReport",
 ]

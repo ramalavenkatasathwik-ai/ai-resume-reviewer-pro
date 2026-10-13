@@ -7,6 +7,7 @@ from app.database.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.job_match import JobMatchReport
 
 
 class ResumeDocument(Base, TimestampMixin):
@@ -57,6 +58,11 @@ class ResumeDocument(Base, TimestampMixin):
         cascade="all, delete-orphan",
         order_by="ResumeVersion.version_number.desc()",
         foreign_keys="ResumeVersion.resume_id",
+    )
+    job_matches: Mapped[List["JobMatchReport"]] = relationship(
+        "JobMatchReport",
+        back_populates="resume",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (

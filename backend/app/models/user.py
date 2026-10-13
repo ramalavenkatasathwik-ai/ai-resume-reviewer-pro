@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.models.analysis import AnalysisHistory
     from app.models.resume import ResumeDocument
     from app.models.stored_file import StoredFile
+    from app.models.job_match import JobMatchReport
 
 
 class User(Base, TimestampMixin):
@@ -62,6 +63,11 @@ class User(Base, TimestampMixin):
     )
     stored_files: Mapped[List["StoredFile"]] = relationship(
         "StoredFile",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    job_matches: Mapped[List["JobMatchReport"]] = relationship(
+        "JobMatchReport",
         back_populates="user",
         cascade="all, delete-orphan",
     )

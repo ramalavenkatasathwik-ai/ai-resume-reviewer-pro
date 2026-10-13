@@ -14,6 +14,7 @@ import {
   Calendar,
   Layers,
   RotateCcw,
+  Briefcase,
 } from 'lucide-react';
 import { resumeDocumentService } from '@/services/resumeDocumentService';
 import { ResumeSummary, ResumeVersionSummary } from '@/types/resume';
@@ -422,11 +423,20 @@ export const ResumesPage: React.FC = () => {
 
                   <SecondaryButton
                     size="sm"
+                    onClick={() => navigate(`/job-match?resume_id=${resume.id}`)}
+                    className="text-xs border-[#303038]"
+                    title="Match with Job Description"
+                  >
+                    <Briefcase className="w-3.5 h-3.5 text-[#FF7417]" />
+                  </SecondaryButton>
+
+                  <SecondaryButton
+                    size="sm"
                     onClick={() => handleOpenVersions(resume)}
                     className="text-xs border-[#303038]"
                     title="Version History"
                   >
-                    <History className="w-3.5 h-3.5 text-[#FF7417]" />
+                    <History className="w-3.5 h-3.5 text-[#A1A1AA]" />
                   </SecondaryButton>
                 </div>
 
