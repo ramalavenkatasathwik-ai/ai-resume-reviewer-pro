@@ -9,6 +9,7 @@ on:
 jobs:
   backend-tests:
     name: Backend Tests & Linting
+    runs-on: ubuntu-latest
     env:
       APP_ENV: test
       SECRET_KEY: ci-test-secret-key-for-automated-runs-64-character-string-long
