@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.resume import ResumeDocument
     from app.models.stored_file import StoredFile
     from app.models.job_match import JobMatchReport
+    from app.models.email_log import EmailDeliveryLog
 
 
 class User(Base, TimestampMixin):
@@ -68,6 +69,11 @@ class User(Base, TimestampMixin):
     )
     job_matches: Mapped[List["JobMatchReport"]] = relationship(
         "JobMatchReport",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    email_logs: Mapped[List["EmailDeliveryLog"]] = relationship(
+        "EmailDeliveryLog",
         back_populates="user",
         cascade="all, delete-orphan",
     )

@@ -18,9 +18,13 @@ import {
   ShieldCheck,
   RefreshCw,
   Clock,
+  Mail,
+  FileDown,
+  Loader2,
 } from 'lucide-react';
 import { jobMatchService } from '@/services/jobMatchService';
 import { resumeDocumentService } from '@/services/resumeDocumentService';
+import { exportService } from '@/services/exportService';
 import { ResumeSummary, ResumeVersionSummary } from '@/types/resume';
 import {
   JobMatchReportDetail,
@@ -35,6 +39,7 @@ import { Toast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { EmailModal } from '@/components/ui/EmailModal';
 
 export const JobMatchPage: React.FC = () => {
   const navigate = useNavigate();
@@ -84,6 +89,10 @@ export const JobMatchPage: React.FC = () => {
   const [reportToDelete, setReportToDelete] = useState<JobMatchReportSummary | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
+  // Export & Email state
+  const [isDownloadingFitReport, setIsDownloadingFitReport] = useState<boolean>(false);
+  const [emailJobMatchReport, setEmailJobMatchReport] = useState<{ id: string; job_title: string } | null>(null);
+
   // Category filter in requirements matrix
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
@@ -94,6 +103,22 @@ export const JobMatchPage: React.FC = () => {
   const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     setToastMessage(message);
     setToastType(type);
+  };
+
+  const handleDownloadFitReport = async (reportId: string) => {
+    setIsDownloadingFitReport(true);
+    try {
+      await exportService.downloadJobMatchReportPdf(reportId);
+      showToast('Job fit evaluation PDF downloaded successfully.', 'success');
+    } catch (err: unknown) {
+      let msg = 'Failed to download fit evaluation PDF.';
+      if (axios.isAxiosError(err)) {
+        msg = err.response?.data?.detail?.message || err.message || msg;
+      }
+      showToast(msg, 'error');
+    } finally {
+      setIsDownloadingFitReport(false);
+    }
   };
 
   // 1. Fetch user resumes on mount
@@ -573,6 +598,23 @@ export const JobMatchPage: React.FC = () => {
                         Load Report
                       </SecondaryButton>
                       <button
+                        onClick={() => handleDownloadFitReport(report.id)}
+                        disabled={isDownloadingFitReport}
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-[#FF7417] hover:bg-[#141419] border border-[#303038] transition-colors disabled:opacity-50"
+                        title="Download PDF"
+                      >
+                        <FileDown className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          setEmailJobMatchReport({ id: report.id, job_title: report.job_title })
+                        }
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-[#FF7417] hover:bg-[#141419] border border-[#303038] transition-colors"
+                        title="Email report"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => setReportToDelete(report)}
                         className="p-1.5 rounded-lg text-zinc-500 hover:text-[#F04452] hover:bg-[#C91432]/10 transition-colors"
                         title="Delete report"
@@ -807,6 +849,38 @@ export const JobMatchPage: React.FC = () => {
                           <Building className="w-3.5 h-3.5 text-zinc-500" />
                           {currentReport.company_name || 'Target Company'} &bull; Scoring Engine {currentReport.scoring_version}
                         </p>
+
+                        <div className="flex flex-wrap items-center gap-2 mt-3">
+                          <SecondaryButton
+                            size="sm"
+                            onClick={() => handleDownloadFitReport(currentReport.id)}
+                            disabled={isDownloadingFitReport}
+                            className="border-[#303038] text-xs py-1"
+                            title="Download PDF evaluation report"
+                          >
+                            {isDownloadingFitReport ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FF7417]" />
+                            ) : (
+                              <FileDown className="w-3.5 h-3.5 text-[#FF7417]" />
+                            )}
+                            <span>Download PDF</span>
+                          </SecondaryButton>
+
+                          <SecondaryButton
+                            size="sm"
+                            onClick={() =>
+                              setEmailJobMatchReport({
+                                id: currentReport.id,
+                                job_title: currentReport.job_title,
+                              })
+                            }
+                            className="border-[#303038] text-xs py-1"
+                            title="Email fit evaluation report"
+                          >
+                            <Mail className="w-3.5 h-3.5 text-[#FF7417]" />
+                            <span>Email Report</span>
+                          </SecondaryButton>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-4">
@@ -1305,6 +1379,17 @@ export const JobMatchPage: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* EMAIL MODAL */}
+      {emailJobMatchReport && (
+        <EmailModal
+          isOpen={!!emailJobMatchReport}
+          onClose={() => setEmailJobMatchReport(null)}
+          documentType="job_match_pdf"
+          documentId={emailJobMatchReport.id}
+          documentTitle={emailJobMatchReport.job_title}
+        />
       )}
     </div>
   );

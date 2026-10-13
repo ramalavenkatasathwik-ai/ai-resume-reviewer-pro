@@ -14,12 +14,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Printer,
+  Mail,
+  FileDown,
+  Loader2,
 } from 'lucide-react';
 import { analysisReportService } from '@/services/analysisReportService';
+import { exportService } from '@/services/exportService';
 import { AnalysisReportSummary, AnalysisReportDetail } from '@/types/analysisReport';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { Toast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
+import { EmailModal } from '@/components/ui/EmailModal';
 
 export const ReportsPage: React.FC = () => {
   const [reports, setReports] = useState<AnalysisReportSummary[]>([]);
@@ -43,6 +48,28 @@ export const ReportsPage: React.FC = () => {
   // Delete modal state
   const [reportToDelete, setReportToDelete] = useState<AnalysisReportSummary | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  // Export & Email state
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
+  const [emailReport, setEmailReport] = useState<{ id: string; title: string } | null>(null);
+
+  const handleDownloadPdf = async (reportId: string) => {
+    setIsDownloadingPdf(true);
+    try {
+      await exportService.downloadAnalysisReportPdf(reportId);
+      setToastMessage('Analysis report PDF downloaded successfully.');
+      setToastType('success');
+    } catch (err: unknown) {
+      let msg = 'Failed to download analysis report PDF.';
+      if (axios.isAxiosError(err)) {
+        msg = err.response?.data?.detail?.message || err.message || msg;
+      }
+      setToastMessage(msg);
+      setToastType('error');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   const fetchReports = useCallback(async () => {
     setIsLoading(true);
@@ -379,6 +406,32 @@ export const ReportsPage: React.FC = () => {
                     <span>View Report</span>
                   </SecondaryButton>
 
+                  {isCompleted && (
+                    <button
+                      onClick={() => handleDownloadPdf(report.id)}
+                      disabled={isDownloadingPdf}
+                      className="p-2 rounded-xl text-[#A1A1AA] hover:text-[#FF7417] hover:bg-[#1C1C23] border border-[#303038] transition-all disabled:opacity-50"
+                      title="Download PDF Summary"
+                    >
+                      <FileDown className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  {isCompleted && (
+                    <button
+                      onClick={() =>
+                        setEmailReport({
+                          id: report.id,
+                          title: report.original_filename || report.target_role,
+                        })
+                      }
+                      className="p-2 rounded-xl text-[#A1A1AA] hover:text-[#FF7417] hover:bg-[#1C1C23] border border-[#303038] transition-all"
+                      title="Email Report"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
                   <button
                     onClick={() => setReportToDelete(report)}
                     className="p-2 rounded-xl text-[#A1A1AA] hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all"
@@ -567,11 +620,43 @@ export const ReportsPage: React.FC = () => {
               )}
 
               {/* Modal footer */}
-              <div className="pt-4 border-t border-[#303038] flex items-center justify-between">
-                <SecondaryButton size="sm" onClick={() => window.print()} className="border-[#303038]">
-                  <Printer className="w-3.5 h-3.5 text-[#FF7417]" />
-                  <span>Print Report</span>
-                </SecondaryButton>
+              <div className="pt-4 border-t border-[#303038] flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <SecondaryButton
+                    size="sm"
+                    onClick={() => handleDownloadPdf(selectedReport.id)}
+                    disabled={isDownloadingPdf}
+                    className="border-[#303038]"
+                    title="Download executive PDF analysis summary"
+                  >
+                    {isDownloadingPdf ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FF7417]" />
+                    ) : (
+                      <FileDown className="w-3.5 h-3.5 text-[#FF7417]" />
+                    )}
+                    <span>Download PDF</span>
+                  </SecondaryButton>
+
+                  <SecondaryButton
+                    size="sm"
+                    onClick={() =>
+                      setEmailReport({
+                        id: selectedReport.id,
+                        title: selectedReport.original_filename || selectedReport.target_role,
+                      })
+                    }
+                    className="border-[#303038]"
+                    title="Email analysis report"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-[#FF7417]" />
+                    <span>Email Report</span>
+                  </SecondaryButton>
+
+                  <SecondaryButton size="sm" onClick={() => window.print()} className="border-[#303038]">
+                    <Printer className="w-3.5 h-3.5 text-[#FF7417]" />
+                    <span>Print</span>
+                  </SecondaryButton>
+                </div>
 
                 <SecondaryButton
                   size="sm"
@@ -623,6 +708,17 @@ export const ReportsPage: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Email Report Modal */}
+      {emailReport && (
+        <EmailModal
+          isOpen={!!emailReport}
+          onClose={() => setEmailReport(null)}
+          documentType="analysis_pdf"
+          documentId={emailReport.id}
+          documentTitle={emailReport.title}
+        />
       )}
     </div>
   );

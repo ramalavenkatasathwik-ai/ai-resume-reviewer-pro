@@ -15,13 +15,18 @@ import {
   Layers,
   RotateCcw,
   Briefcase,
+  Mail,
+  FileDown,
+  Loader2,
 } from 'lucide-react';
 import { resumeDocumentService } from '@/services/resumeDocumentService';
+import { exportService } from '@/services/exportService';
 import { ResumeSummary, ResumeVersionSummary } from '@/types/resume';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { Toast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
+import { EmailModal } from '@/components/ui/EmailModal';
 
 export const ResumesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -54,6 +59,47 @@ export const ResumesPage: React.FC = () => {
   // Delete Modal
   const [resumeToDelete, setResumeToDelete] = useState<ResumeSummary | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+
+  // Export & Email State
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<string | null>(null);
+  const [isDownloadingDocx, setIsDownloadingDocx] = useState<string | null>(null);
+  const [emailResumeData, setEmailResumeData] = useState<{ id: string; title: string; versionId?: string } | null>(null);
+
+  const handleDownloadPdf = async (resumeId: string, versionId: string) => {
+    setIsDownloadingPdf(versionId);
+    try {
+      await exportService.downloadResumeVersionPdf(resumeId, versionId);
+      setToastMessage('Resume PDF downloaded successfully.');
+      setToastType('success');
+    } catch (err: unknown) {
+      let msg = 'Failed to download resume PDF.';
+      if (axios.isAxiosError(err)) {
+        msg = err.response?.data?.detail?.message || err.message || msg;
+      }
+      setToastMessage(msg);
+      setToastType('error');
+    } finally {
+      setIsDownloadingPdf(null);
+    }
+  };
+
+  const handleDownloadDocx = async (resumeId: string, versionId: string) => {
+    setIsDownloadingDocx(versionId);
+    try {
+      await exportService.downloadResumeVersionDocx(resumeId, versionId);
+      setToastMessage('Resume Word DOCX downloaded successfully.');
+      setToastType('success');
+    } catch (err: unknown) {
+      let msg = 'Failed to download Word DOCX.';
+      if (axios.isAxiosError(err)) {
+        msg = err.response?.data?.detail?.message || err.message || msg;
+      }
+      setToastMessage(msg);
+      setToastType('error');
+    } finally {
+      setIsDownloadingDocx(null);
+    }
+  };
 
   const fetchResumes = useCallback(async () => {
     setIsLoading(true);
@@ -438,6 +484,52 @@ export const ResumesPage: React.FC = () => {
                   >
                     <History className="w-3.5 h-3.5 text-[#A1A1AA]" />
                   </SecondaryButton>
+
+                  {resume.current_version_id && (
+                    <button
+                      onClick={() => handleDownloadPdf(resume.id, resume.current_version_id!)}
+                      disabled={isDownloadingPdf === resume.current_version_id}
+                      className="p-2 rounded-xl text-xs text-[#A1A1AA] hover:text-[#FF7417] hover:bg-[#1C1C23] border border-[#303038] transition-colors disabled:opacity-50"
+                      title="Download PDF"
+                    >
+                      {isDownloadingPdf === resume.current_version_id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FF7417]" />
+                      ) : (
+                        <FileDown className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  )}
+
+                  {resume.current_version_id && (
+                    <button
+                      onClick={() => handleDownloadDocx(resume.id, resume.current_version_id!)}
+                      disabled={isDownloadingDocx === resume.current_version_id}
+                      className="p-2 rounded-xl text-xs text-[#A1A1AA] hover:text-[#FF7417] hover:bg-[#1C1C23] border border-[#303038] transition-colors disabled:opacity-50"
+                      title="Download Word DOCX"
+                    >
+                      {isDownloadingDocx === resume.current_version_id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FF7417]" />
+                      ) : (
+                        <FileText className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  )}
+
+                  {resume.current_version_id && (
+                    <button
+                      onClick={() =>
+                        setEmailResumeData({
+                          id: resume.id,
+                          title: resume.title,
+                          versionId: resume.current_version_id || undefined,
+                        })
+                      }
+                      className="p-2 rounded-xl text-xs text-[#A1A1AA] hover:text-[#FF7417] hover:bg-[#1C1C23] border border-[#303038] transition-colors"
+                      title="Email Resume"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between gap-1 pt-1">
@@ -647,7 +739,44 @@ export const ResumesPage: React.FC = () => {
                         </div>
                       </div>
 
-                      <div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleDownloadPdf(versionResume.id, ver.id)}
+                          disabled={isDownloadingPdf === ver.id}
+                          className="p-1.5 rounded-lg text-xs text-[#A1A1AA] hover:text-[#FF7417] hover:bg-[#1C1C23] border border-[#303038] transition-colors disabled:opacity-50"
+                          title="Download PDF version snapshot"
+                        >
+                          {isDownloadingPdf === ver.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FF7417]" />
+                          ) : (
+                            <FileDown className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => handleDownloadDocx(versionResume.id, ver.id)}
+                          disabled={isDownloadingDocx === ver.id}
+                          className="p-1.5 rounded-lg text-xs text-[#A1A1AA] hover:text-[#FF7417] hover:bg-[#1C1C23] border border-[#303038] transition-colors disabled:opacity-50"
+                          title="Download Word DOCX version snapshot"
+                        >
+                          {isDownloadingDocx === ver.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FF7417]" />
+                          ) : (
+                            <FileText className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() =>
+                            setEmailResumeData({
+                              id: versionResume.id,
+                              title: `${versionResume.title} (v${ver.version_number})`,
+                              versionId: ver.id,
+                            })
+                          }
+                          className="p-1.5 rounded-lg text-xs text-[#A1A1AA] hover:text-[#FF7417] hover:bg-[#1C1C23] border border-[#303038] transition-colors"
+                          title="Email version snapshot"
+                        >
+                          <Mail className="w-3.5 h-3.5" />
+                        </button>
                         {!isCurrent && (
                           <SecondaryButton
                             size="sm"
@@ -711,6 +840,18 @@ export const ResumesPage: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Email Resume Modal */}
+      {emailResumeData && (
+        <EmailModal
+          isOpen={!!emailResumeData}
+          onClose={() => setEmailResumeData(null)}
+          documentType="resume_pdf"
+          documentId={emailResumeData.id}
+          documentTitle={emailResumeData.title}
+          versionId={emailResumeData.versionId}
+        />
       )}
     </div>
   );

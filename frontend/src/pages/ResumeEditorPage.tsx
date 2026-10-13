@@ -10,8 +10,13 @@ import {
   Trash2,
   RefreshCw,
   RotateCcw,
+  Mail,
+  FileDown,
+  FileText,
+  Loader2,
 } from 'lucide-react';
 import { resumeDocumentService } from '@/services/resumeDocumentService';
+import { exportService } from '@/services/exportService';
 import {
   ResumeDetail,
   ResumeVersionSummary,
@@ -21,6 +26,7 @@ import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
 import { Toast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
+import { EmailModal } from '@/components/ui/EmailModal';
 
 export const ResumeEditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -56,6 +62,11 @@ export const ResumeEditorPage: React.FC = () => {
   const [versionsList, setVersionsList] = useState<ResumeVersionSummary[]>([]);
   const [isLoadingVersions, setIsLoadingVersions] = useState<boolean>(false);
   const [isRestoring, setIsRestoring] = useState<boolean>(false);
+
+  // Export & Email State
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
+  const [isExportingDocx, setIsExportingDocx] = useState<boolean>(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState<boolean>(false);
 
   // New skill input
   const [newSkill, setNewSkill] = useState<string>('');
@@ -113,6 +124,52 @@ export const ResumeEditorPage: React.FC = () => {
       setToastType('error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!id) return;
+    setIsExportingPdf(true);
+    try {
+      await exportService.downloadUnsavedResumePdf(id, {
+        resume_data: resumeData,
+        template_name: templateName,
+        page_format: pageFormat === 'a4' ? 'a4' : 'letter',
+      });
+      setToastMessage('Resume PDF generated and downloaded successfully.');
+      setToastType('success');
+    } catch (err: unknown) {
+      let msg = 'Failed to generate resume PDF.';
+      if (axios.isAxiosError(err)) {
+        msg = err.response?.data?.detail?.message || err.message || msg;
+      }
+      setToastMessage(msg);
+      setToastType('error');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleExportDocx = async () => {
+    if (!id) return;
+    setIsExportingDocx(true);
+    try {
+      await exportService.downloadUnsavedResumeDocx(id, {
+        resume_data: resumeData,
+        template_name: templateName,
+        page_format: pageFormat === 'a4' ? 'a4' : 'letter',
+      });
+      setToastMessage('Resume Word DOCX generated and downloaded successfully.');
+      setToastType('success');
+    } catch (err: unknown) {
+      let msg = 'Failed to generate resume DOCX.';
+      if (axios.isAxiosError(err)) {
+        msg = err.response?.data?.detail?.message || err.message || msg;
+      }
+      setToastMessage(msg);
+      setToastType('error');
+    } finally {
+      setIsExportingDocx(false);
     }
   };
 
@@ -318,10 +375,53 @@ export const ResumeEditorPage: React.FC = () => {
             <span className="hidden sm:inline">Versions</span>
           </SecondaryButton>
 
+          {/* Export PDF Button */}
+          <SecondaryButton
+            size="sm"
+            onClick={handleExportPdf}
+            disabled={isExportingPdf}
+            className="border-[#303038]"
+            title="Download text-selectable PDF"
+          >
+            {isExportingPdf ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FF7417]" />
+            ) : (
+              <FileDown className="w-3.5 h-3.5 text-[#FF7417]" />
+            )}
+            <span className="hidden md:inline">PDF</span>
+          </SecondaryButton>
+
+          {/* Export DOCX Button */}
+          <SecondaryButton
+            size="sm"
+            onClick={handleExportDocx}
+            disabled={isExportingDocx}
+            className="border-[#303038]"
+            title="Download editable Microsoft Word DOCX"
+          >
+            {isExportingDocx ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#FF7417]" />
+            ) : (
+              <FileText className="w-3.5 h-3.5 text-[#FF7417]" />
+            )}
+            <span className="hidden md:inline">Word</span>
+          </SecondaryButton>
+
+          {/* Email Document Button */}
+          <SecondaryButton
+            size="sm"
+            onClick={() => setIsEmailModalOpen(true)}
+            className="border-[#303038]"
+            title="Email resume attachment"
+          >
+            <Mail className="w-3.5 h-3.5 text-[#FF7417]" />
+            <span className="hidden md:inline">Email</span>
+          </SecondaryButton>
+
           {/* Print Button */}
           <SecondaryButton size="sm" onClick={() => window.print()} className="border-[#303038]">
             <Printer className="w-3.5 h-3.5 text-[#FF7417]" />
-            <span className="hidden sm:inline">Print / PDF</span>
+            <span className="hidden sm:inline">Print</span>
           </SecondaryButton>
 
           {/* Save Version */}
@@ -936,6 +1036,21 @@ export const ResumeEditorPage: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Email Delivery Modal */}
+      {isEmailModalOpen && resume && (
+        <EmailModal
+          isOpen={isEmailModalOpen}
+          onClose={() => setIsEmailModalOpen(false)}
+          documentType="resume_pdf"
+          documentId={resume.id}
+          documentTitle={resume.title}
+          versionId={resume.current_version_id}
+          unsavedResumeData={resumeData}
+          templateName={templateName}
+          pageFormat={pageFormat === 'a4' ? 'a4' : 'letter'}
+        />
       )}
     </div>
   );

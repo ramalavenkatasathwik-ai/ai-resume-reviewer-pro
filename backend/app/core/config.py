@@ -59,7 +59,13 @@ class Settings(BaseSettings):
     AUTH_COOKIE_SECURE: bool = False  # Set to True in production (HTTPS)
     AUTH_COOKIE_SAMESITE: str = "lax"
 
-    # Password Reset & Email Configuration (SMTP)
+    # Password Reset & Email Delivery Configuration
+    EMAIL_PROVIDER: str = "smtp"  # "smtp", "resend", "sendgrid", "none"
+    EMAIL_API_KEY: Optional[str] = None
+    EMAIL_FROM_ADDRESS: Optional[str] = None
+    EMAIL_FROM_NAME: str = "AI Resume Reviewer Pro"
+    PUBLIC_APP_URL: str = "http://localhost:5173"
+    MAX_EMAIL_ATTACHMENT_SIZE_MB: int = 15
     SMTP_HOST: Optional[str] = None
     SMTP_PORT: Optional[int] = 587
     SMTP_USER: Optional[str] = None
@@ -106,6 +112,17 @@ class Settings(BaseSettings):
     @property
     def is_smtp_configured(self) -> bool:
         return bool(self.SMTP_HOST and self.SMTP_PORT)
+
+    @property
+    def is_email_configured(self) -> bool:
+        provider = (self.EMAIL_PROVIDER or "none").strip().lower()
+        if provider == "none":
+            return False
+        if provider in ("resend", "sendgrid"):
+            return bool(self.EMAIL_API_KEY and self.EMAIL_API_KEY.strip())
+        if provider == "smtp":
+            return bool(self.SMTP_HOST and self.SMTP_PORT)
+        return False
 
     @property
     def max_upload_size_bytes(self) -> int:
