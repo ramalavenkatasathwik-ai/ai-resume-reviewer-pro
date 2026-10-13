@@ -1,0 +1,13 @@
+{
+  "name": "ai-resume-reviewer-pro",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "build": "npm --workspace=frontend run build",
+    "lint": "npm --workspace=frontend run lint",
+    "test": "npm --workspace=frontend test"
+  }
+}
