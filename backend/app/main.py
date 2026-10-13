@@ -28,19 +28,34 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def create_application() -> FastAPI:
     """Application factory for FastAPI."""
+    docs_url = "/docs" if not settings.is_production else None
+    redoc_url = "/redoc" if not settings.is_production else None
+    openapi_url = "/openapi.json" if not settings.is_production else None
+
     app = FastAPI(
         title="AI Resume Reviewer Pro API",
         description="Production Backend API for AI-powered Resume, ATS, and Career Analysis (BYOK)",
         version="0.2.0",
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        docs_url=docs_url,
+        redoc_url=redoc_url,
+        openapi_url=openapi_url,
         lifespan=lifespan,
     )
 
     # Attach Slowapi Rate Limiter
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    # Security Headers Middleware
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        return response
 
     # CORS configuration with strict origins
     app.add_middleware(

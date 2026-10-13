@@ -14,6 +14,7 @@ from app.core.security import (
     generate_reset_token,
     hash_reset_token,
     get_current_user,
+    get_optional_current_user,
 )
 from app.database.database import get_db
 from app.database.base import utc_now
@@ -105,8 +106,9 @@ def register(
 
     logger.info("New user registered successfully with ID: %s", user.id)
 
-    # Issue token
-    access_token = create_access_token({"sub": user.id, "email": user.email})
+    # Issue token with token version for revocation tracking
+    token_v = getattr(user, "token_version", 1)
+    access_token = create_access_token({"sub": user.id, "email": user.email, "v": token_v})
     _set_auth_cookie(response, access_token)
 
     return TokenResponse(
@@ -144,7 +146,8 @@ def login(
             },
         )
 
-    access_token = create_access_token({"sub": user.id, "email": user.email})
+    token_v = getattr(user, "token_version", 1)
+    access_token = create_access_token({"sub": user.id, "email": user.email, "v": token_v})
     _set_auth_cookie(response, access_token)
 
     logger.info("User logged in successfully with ID: %s", user.id)
@@ -160,8 +163,15 @@ def login(
     "/logout",
     summary="User logout and session invalidation",
 )
-def logout(response: Response):
-    """Log out current user by clearing the HttpOnly session cookie."""
+def logout(
+    response: Response,
+    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: Session = Depends(get_db),
+):
+    """Log out current user by clearing the HttpOnly session cookie and invalidating active bearer tokens."""
+    if current_user:
+        current_user.token_version = (current_user.token_version or 1) + 1
+        db.commit()
     _clear_auth_cookie(response)
     return {"status": "success", "message": "Successfully logged out."}
 
@@ -215,8 +225,9 @@ def change_password(
         )
 
     current_user.hashed_password = hash_password(payload.new_password)
+    current_user.token_version = (current_user.token_version or 1) + 1
     db.commit()
-    logger.info("User %s changed password successfully.", current_user.id)
+    logger.info("User %s changed password successfully. Active sessions revoked.", current_user.id)
     return {"status": "success", "message": "Password changed successfully."}
 
 
@@ -300,6 +311,7 @@ def reset_password(
 
     # Update password and mark token used
     user.hashed_password = hash_password(payload.new_password)
+    user.token_version = (user.token_version or 1) + 1
     reset_entry.is_used = True
     reset_entry.used_at = utc_now()
 

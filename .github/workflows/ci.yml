@@ -9,7 +9,10 @@ on:
 jobs:
   backend-tests:
     name: Backend Tests & Linting
-    runs-on: ubuntu-latest
+    env:
+      APP_ENV: test
+      SECRET_KEY: ci-test-secret-key-for-automated-runs-64-character-string-long
+      DATABASE_URL: sqlite:///test.db
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -24,6 +27,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
+
+      - name: Verify Python Syntax Compilation
+        run: |
+          python -m compileall backend/app
 
       - name: Run Backend Pytest Suite
         run: |

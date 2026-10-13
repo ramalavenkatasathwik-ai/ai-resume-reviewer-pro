@@ -160,7 +160,7 @@ def get_token_from_request(request: Request) -> Optional[str]:
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
-    """Dependency that enforces authentication and returns current active User."""
+    """Dependency that enforces authentication and returns current active User with token revocation verification."""
     token = get_token_from_request(request)
     if not token:
         raise HTTPException(
@@ -186,6 +186,15 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Token revocation check: if token version in payload does not match user's current version
+    token_v = payload.get("v")
+    if token_v is not None and token_v != getattr(user, "token_version", 1):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": "TOKEN_REVOKED", "message": "Session has been revoked or invalidated. Please log in again."},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return user
 
 
@@ -201,6 +210,14 @@ def get_optional_current_user(request: Request, db: Session = Depends(get_db)) -
 
     user_id = payload.get("sub")
     user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    if not user:
+        return None
+
+    # Verify token revocation if token version present
+    token_v = payload.get("v")
+    if token_v is not None and token_v != getattr(user, "token_version", 1):
+        return None
+
     return user
 
 

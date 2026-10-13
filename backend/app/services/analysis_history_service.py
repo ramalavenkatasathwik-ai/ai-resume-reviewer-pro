@@ -60,12 +60,15 @@ class AnalysisHistoryService:
 
     @staticmethod
     def get_by_id(db: Session, record_id: str, user_id: Optional[str] = None) -> Optional[AnalysisHistory]:
-        """Retrieves a single review record by ID, optionally verifying ownership."""
+        """Retrieves a single review record by ID, strictly enforcing authorization boundaries."""
         statement = select(AnalysisHistory).where(AnalysisHistory.id == record_id)
         if user_id is not None:
             statement = statement.where(
                 or_(AnalysisHistory.user_id == user_id, AnalysisHistory.user_id.is_(None))
             )
+        else:
+            # Unauthenticated callers can strictly access only unauthenticated analysis records
+            statement = statement.where(AnalysisHistory.user_id.is_(None))
         return db.scalar(statement)
 
     @staticmethod

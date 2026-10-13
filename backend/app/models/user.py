@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 
-from sqlalchemy import String, Boolean, DateTime, ForeignKey, Index
+from sqlalchemy import String, Boolean, DateTime, ForeignKey, Index, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base, TimestampMixin
@@ -45,6 +45,12 @@ class User(Base, TimestampMixin):
         Boolean,
         default=True,
         nullable=False,
+    )
+    token_version: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
+        nullable=False,
+        server_default="1",
     )
 
     # Relationships with cascade delete on user removal
