@@ -67,10 +67,11 @@ def create_application() -> FastAPI:
 
         return response
 
-    # CORS configuration with strict origins
+    # CORS configuration with strict origins + Vercel origin regex
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
+        allow_origin_regex=settings.CORS_ORIGIN_REGEX,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],

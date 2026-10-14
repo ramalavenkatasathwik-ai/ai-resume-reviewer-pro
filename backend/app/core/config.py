@@ -32,6 +32,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "http://127.0.0.1:3000",
     ]
+    CORS_ORIGIN_REGEX: Optional[str] = r"^https:\/\/.*\.vercel\.app$"
 
     # Server-Side Gemini LLM Configuration (Shared Admin Key)
     GEMINI_API_KEY: Optional[str] = None

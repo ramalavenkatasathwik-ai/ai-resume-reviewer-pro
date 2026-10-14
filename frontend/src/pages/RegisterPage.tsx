@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_BASE_URL } from '@/lib/axios';
 import { useAuth } from '@/context/AuthContext';
 import {
   UserPlus,
@@ -125,12 +126,16 @@ export const RegisterPage: React.FC = () => {
         } else if (err.response?.status === 429) {
           message = 'Too many registration attempts. Please wait a moment and try again.';
         } else if (!err.response) {
-          message = 'Unable to connect to the server. Please check your internet connection.';
+          message = (!API_BASE_URL && typeof window !== 'undefined' && window.location.hostname !== 'localhost')
+            ? 'Backend API not configured. Please add VITE_API_URL in your Vercel project environment variables.'
+            : 'Unable to connect to the server. Please verify your backend server is deployed and running.';
         } else if (typeof detail === 'object' && detail?.message) {
           message = detail.message;
         } else if (typeof detail === 'string') {
           message = detail;
         }
+      } else if (err instanceof Error) {
+        message = err.message;
       }
       setErrorMessage(message);
     } finally {

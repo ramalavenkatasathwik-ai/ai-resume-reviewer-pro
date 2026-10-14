@@ -54,7 +54,7 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: CORS_ORIGINS
-        value: https://ai-resume-reviewer-frontend.onrender.com
+        value: https://ai-resume-reviewer-frontend.onrender.com,https://ai-resume-reviewer-pro-v2.vercel.app
       - key: MAX_UPLOAD_SIZE_MB
         value: "10"
       - key: GEMINI_API_KEY

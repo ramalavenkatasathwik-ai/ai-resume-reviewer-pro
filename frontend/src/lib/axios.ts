@@ -42,8 +42,21 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // If a request intended for the API receives an HTML page (e.g. from an SPA rewrite when backend is missing)
+    const contentType = String(response.headers?.['content-type'] ?? '');
+    if (typeof response.data === 'string' && contentType.includes('text/html') && response.config.url?.includes('/api/')) {
+      const error = new Error(
+        'The backend API is not responding at this domain. If deploying on Vercel, ensure VITE_API_URL is set in your project environment variables.'
+      );
+      return Promise.reject(error);
+    }
+    return response;
+  },
   (error) => {
+    if (!error.response && typeof window !== 'undefined' && window.location.hostname !== 'localhost' && !API_BASE_URL) {
+      error.message = 'Backend API URL (VITE_API_URL) is not configured in Vercel. Please add VITE_API_URL in Project Settings > Environment Variables.';
+    }
     return Promise.reject(error);
   }
 );
