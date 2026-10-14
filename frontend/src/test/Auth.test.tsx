@@ -17,7 +17,7 @@ describe('Authentication & Account Management', () => {
   });
 
   describe('LoginPage', () => {
-    it('renders login form inputs and actions', () => {
+    it('renders login form inputs, labels, and actions with zero BYOK notice', () => {
       render(
         <MemoryRouter>
           <AuthProvider>
@@ -27,11 +27,14 @@ describe('Authentication & Account Management', () => {
       );
 
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Welcome Back/i);
-      expect(screen.getByPlaceholderText(/you@example.com/i)).toBeInTheDocument();
-      expect(screen.getByPlaceholderText(/••••••••/i)).toBeInTheDocument();
+      expect(screen.getByLabelText('Email Address')).toBeInTheDocument();
+      expect(screen.getByLabelText('Password')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Sign In/i })).toBeInTheDocument();
       expect(screen.getByText(/Create an account/i)).toBeInTheDocument();
       expect(screen.getByText(/Forgot password\?/i)).toBeInTheDocument();
+
+      // Verify BYOK notice is completely removed
+      expect(screen.queryByText(/BYOK Privacy/i)).not.toBeInTheDocument();
     });
 
     it('submits credentials and calls authService.login', async () => {
@@ -53,10 +56,10 @@ describe('Authentication & Account Management', () => {
         </MemoryRouter>
       );
 
-      fireEvent.change(screen.getByPlaceholderText(/you@example.com/i), {
+      fireEvent.change(screen.getByLabelText('Email Address'), {
         target: { value: 'test@example.com' },
       });
-      fireEvent.change(screen.getByPlaceholderText(/••••••••/i), {
+      fireEvent.change(screen.getByLabelText('Password'), {
         target: { value: 'Password123!' },
       });
       fireEvent.click(screen.getByRole('button', { name: /Sign In/i }));
@@ -74,9 +77,30 @@ describe('Authentication & Account Management', () => {
       expect(sessionStorage.getItem('token')).toBeNull();
     });
 
-    it('displays error message on invalid credentials', async () => {
+    it('toggles password visibility with accessible show/hide button', () => {
+      render(
+        <MemoryRouter>
+          <AuthProvider>
+            <LoginPage />
+          </AuthProvider>
+        </MemoryRouter>
+      );
+
+      const passwordInput = screen.getByLabelText('Password');
+      expect(passwordInput).toHaveAttribute('type', 'password');
+
+      const toggleButton = screen.getByRole('button', { name: /Show password text/i });
+      fireEvent.click(toggleButton);
+
+      expect(passwordInput).toHaveAttribute('type', 'text');
+      expect(screen.getByRole('button', { name: /Hide password text/i })).toBeInTheDocument();
+    });
+
+    it('displays safe generic error message on invalid credentials without leaking email existence', async () => {
       vi.spyOn(authService, 'login').mockRejectedValue({
+        isAxiosError: true,
         response: {
+          status: 401,
           data: {
             detail: {
               error: 'INVALID_CREDENTIALS',
@@ -94,10 +118,10 @@ describe('Authentication & Account Management', () => {
         </MemoryRouter>
       );
 
-      fireEvent.change(screen.getByPlaceholderText(/you@example.com/i), {
-        target: { value: 'wrong@example.com' },
+      fireEvent.change(screen.getByLabelText('Email Address'), {
+        target: { value: 'unknown@example.com' },
       });
-      fireEvent.change(screen.getByPlaceholderText(/••••••••/i), {
+      fireEvent.change(screen.getByLabelText('Password'), {
         target: { value: 'WrongPass123!' },
       });
       fireEvent.click(screen.getByRole('button', { name: /Sign In/i }));
@@ -106,10 +130,38 @@ describe('Authentication & Account Management', () => {
         expect(screen.getByRole('alert')).toHaveTextContent(/Invalid email address or password/i);
       });
     });
+
+    it('displays network failure message when server is unreachable', async () => {
+      vi.spyOn(authService, 'login').mockRejectedValue({
+        isAxiosError: true,
+        request: {},
+        response: undefined,
+      });
+
+      render(
+        <MemoryRouter>
+          <AuthProvider>
+            <LoginPage />
+          </AuthProvider>
+        </MemoryRouter>
+      );
+
+      fireEvent.change(screen.getByLabelText('Email Address'), {
+        target: { value: 'user@example.com' },
+      });
+      fireEvent.change(screen.getByLabelText('Password'), {
+        target: { value: 'Password123!' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Sign In/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent(/Unable to connect to the authentication server/i);
+      });
+    });
   });
 
   describe('RegisterPage', () => {
-    it('renders registration form with password requirements checklist', () => {
+    it('renders registration form with required Full Name and password requirements checklist', () => {
       render(
         <MemoryRouter>
           <AuthProvider>
@@ -119,6 +171,13 @@ describe('Authentication & Account Management', () => {
       );
 
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/Create Account/i);
+      expect(screen.getByLabelText('Full Name')).toBeInTheDocument();
+      expect(screen.getByLabelText('Email Address')).toBeInTheDocument();
+      expect(screen.getByLabelText('Password')).toBeInTheDocument();
+      expect(screen.getByLabelText('Confirm Password')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Create Account/i })).toBeInTheDocument();
+
+      // Password checklist
       expect(screen.getByText(/8\+ characters/i)).toBeInTheDocument();
       expect(screen.getByText(/Uppercase letter/i)).toBeInTheDocument();
       expect(screen.getByText(/Lowercase letter/i)).toBeInTheDocument();
@@ -126,7 +185,71 @@ describe('Authentication & Account Management', () => {
       expect(screen.getByText(/Special character/i)).toBeInTheDocument();
     });
 
-    it('enables submit only when password meets complexity and matches confirm password', async () => {
+    it('displays field-adjacent error for missing or too-short full name', async () => {
+      render(
+        <MemoryRouter>
+          <AuthProvider>
+            <RegisterPage />
+          </AuthProvider>
+        </MemoryRouter>
+      );
+
+      const nameInput = screen.getByLabelText('Full Name');
+      fireEvent.focus(nameInput);
+      fireEvent.change(nameInput, { target: { value: 'A' } });
+      fireEvent.blur(nameInput);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Full name is required \(at least 2 characters\)/i)).toBeInTheDocument();
+      });
+    });
+
+    it('displays field-adjacent error for malformed email address', async () => {
+      render(
+        <MemoryRouter>
+          <AuthProvider>
+            <RegisterPage />
+          </AuthProvider>
+        </MemoryRouter>
+      );
+
+      const emailInput = screen.getByLabelText('Email Address');
+      fireEvent.focus(emailInput);
+      fireEvent.change(emailInput, { target: { value: 'not-an-email' } });
+      fireEvent.blur(emailInput);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Please provide a valid email address/i)).toBeInTheDocument();
+      });
+    });
+
+    it('displays field-adjacent error when passwords do not match and prevents submission', async () => {
+      render(
+        <MemoryRouter>
+          <AuthProvider>
+            <RegisterPage />
+          </AuthProvider>
+        </MemoryRouter>
+      );
+
+      fireEvent.change(screen.getByLabelText('Password'), {
+        target: { value: 'SecurePass123!' },
+      });
+      const confirmInput = screen.getByLabelText('Confirm Password');
+      fireEvent.change(confirmInput, {
+        target: { value: 'DifferentPass123!' },
+      });
+      fireEvent.blur(confirmInput);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Passwords do not match/i)).toBeInTheDocument();
+      });
+
+      const submitButton = screen.getByRole('button', { name: /Create Account/i });
+      expect(submitButton).toBeDisabled();
+    });
+
+    it('successfully creates account, shows genuine success message, and calls register', async () => {
       const mockUser = {
         id: 'user-456',
         email: 'newuser@example.com',
@@ -148,16 +271,16 @@ describe('Authentication & Account Management', () => {
       const submitButton = screen.getByRole('button', { name: /Create Account/i });
       expect(submitButton).toBeDisabled();
 
-      fireEvent.change(screen.getByPlaceholderText(/Jane Doe/i), {
+      fireEvent.change(screen.getByLabelText('Full Name'), {
         target: { value: 'New User' },
       });
-      fireEvent.change(screen.getByPlaceholderText(/you@example.com/i), {
+      fireEvent.change(screen.getByLabelText('Email Address'), {
         target: { value: 'newuser@example.com' },
       });
-      fireEvent.change(screen.getByPlaceholderText(/At least 8 characters/i), {
+      fireEvent.change(screen.getByLabelText('Password'), {
         target: { value: 'ValidPass123!' },
       });
-      fireEvent.change(screen.getByPlaceholderText(/Confirm password/i), {
+      fireEvent.change(screen.getByLabelText('Confirm Password'), {
         target: { value: 'ValidPass123!' },
       });
 
@@ -173,6 +296,44 @@ describe('Authentication & Account Management', () => {
           password: 'ValidPass123!',
           display_name: 'New User',
         });
+        expect(screen.getByRole('status')).toHaveTextContent(/Account created successfully! Welcome to AI Resume Reviewer Pro/i);
+      });
+    });
+
+    it('handles duplicate email registration failure from backend gracefully', async () => {
+      vi.spyOn(authService, 'register').mockRejectedValue({
+        isAxiosError: true,
+        response: {
+          status: 409,
+          data: {
+            detail: {
+              error: 'EMAIL_ALREADY_REGISTERED',
+              message: 'An account with this email address already exists.',
+            },
+          },
+        },
+      });
+
+      render(
+        <MemoryRouter>
+          <AuthProvider>
+            <RegisterPage />
+          </AuthProvider>
+        </MemoryRouter>
+      );
+
+      fireEvent.change(screen.getByLabelText('Full Name'), { target: { value: 'Duplicate Tester' } });
+      fireEvent.change(screen.getByLabelText('Email Address'), { target: { value: 'existing@example.com' } });
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'ValidPass123!' } });
+      fireEvent.change(screen.getByLabelText('Confirm Password'), { target: { value: 'ValidPass123!' } });
+
+      const submitButton = screen.getByRole('button', { name: /Create Account/i });
+      await waitFor(() => expect(submitButton).not.toBeDisabled());
+
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent(/An account with this email address already exists\. Please sign in instead\./i);
       });
     });
   });

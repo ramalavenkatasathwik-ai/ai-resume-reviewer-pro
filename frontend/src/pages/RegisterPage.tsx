@@ -2,7 +2,19 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '@/context/AuthContext';
-import { UserPlus, Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import {
+  UserPlus,
+  Mail,
+  Lock,
+  User as UserIcon,
+  Eye,
+  EyeOff,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+} from 'lucide-react';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -12,13 +24,18 @@ export const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Real-time password validation indicators
+  // Password rules validation
   const rules = {
-    length: password.length >= 8,
+    length: password.length >= 8 && password.length <= 128,
     lowercase: /[a-z]/.test(password),
     uppercase: /[A-Z]/.test(password),
     number: /[0-9]/.test(password),
@@ -26,14 +43,52 @@ export const RegisterPage: React.FC = () => {
   };
 
   const isPasswordValid = Object.values(rules).every(Boolean);
+  const isEmailValid = EMAIL_REGEX.test(email.trim());
+  const isNameValid = displayName.trim().length >= 2;
   const doPasswordsMatch = password.length > 0 && password === confirmPassword;
+
+  // Validation helpers for field-adjacent errors
+  const nameError = touched.displayName && !isNameValid
+    ? 'Full name is required (at least 2 characters).'
+    : null;
+
+  const emailError = touched.email && !isEmailValid
+    ? 'Please provide a valid email address.'
+    : null;
+
+  const passwordError = touched.password && !isPasswordValid
+    ? 'Password must meet all complexity requirements.'
+    : null;
+
+  const confirmError = touched.confirmPassword && !doPasswordsMatch
+    ? 'Passwords do not match.'
+    : null;
+
+  const isFormValid = isNameValid && isEmailValid && isPasswordValid && doPasswordsMatch;
+
+  const handleBlur = (field: string) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    const cleanEmail = email.trim();
-    if (!cleanEmail) {
+    // Mark all as touched on submit attempt
+    setTouched({
+      displayName: true,
+      email: true,
+      password: true,
+      confirmPassword: true,
+    });
+
+    if (!isNameValid) {
+      setErrorMessage('Please provide your full name (at least 2 characters).');
+      return;
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!isEmailValid) {
       setErrorMessage('Please provide a valid email address.');
       return;
     }
@@ -53,14 +108,25 @@ export const RegisterPage: React.FC = () => {
       await register({
         email: cleanEmail,
         password,
-        display_name: displayName.trim() || undefined,
+        display_name: displayName.trim(),
       });
-      navigate('/dashboard', { replace: true });
+
+      // Display genuine success message confirmed by the backend
+      setSuccessMessage('Account created successfully! Welcome to AI Resume Reviewer Pro.');
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true, state: { accountCreated: true } });
+      }, 1000);
     } catch (err: unknown) {
       let message = 'Registration failed. Please check your information and try again.';
       if (axios.isAxiosError(err)) {
         const detail = err.response?.data?.detail;
-        if (typeof detail === 'object' && detail?.message) {
+        if (err.response?.status === 409) {
+          message = 'An account with this email address already exists. Please sign in instead.';
+        } else if (err.response?.status === 429) {
+          message = 'Too many registration attempts. Please wait a moment and try again.';
+        } else if (!err.response) {
+          message = 'Unable to connect to the server. Please check your internet connection.';
+        } else if (typeof detail === 'object' && detail?.message) {
           message = detail.message;
         } else if (typeof detail === 'string') {
           message = detail;
@@ -98,28 +164,62 @@ export const RegisterPage: React.FC = () => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {successMessage && (
+          <div
+            role="status"
+            className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-start gap-3 text-sm text-emerald-400"
+          >
+            <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5 text-emerald-400" />
+            <span>{successMessage}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          {/* Full Name */}
           <div>
-            <label className="block text-xs font-semibold text-secondary-text uppercase tracking-wider mb-2">
-              Full Name <span className="text-secondary-text/50 lowercase">(optional)</span>
+            <label
+              htmlFor="register-display-name"
+              className="block text-xs font-semibold text-secondary-text uppercase tracking-wider mb-2"
+            >
+              Full Name
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-secondary-text">
-                <User className="w-4 h-4" />
+                <UserIcon className="w-4 h-4" />
               </div>
               <input
+                id="register-display-name"
+                name="displayName"
                 type="text"
+                required
                 autoComplete="name"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
+                onBlur={() => handleBlur('displayName')}
                 placeholder="Jane Doe"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-elevated-surface border border-borders/60 text-primary-text placeholder-secondary-text/50 text-sm focus:outline-none focus:border-primary-red transition"
+                aria-invalid={!!nameError}
+                aria-describedby={nameError ? 'name-error' : undefined}
+                className={`w-full pl-10 pr-4 py-2.5 rounded-xl bg-elevated-surface border text-primary-text placeholder-secondary-text/50 text-sm focus:outline-none transition ${
+                  nameError
+                    ? 'border-bright-red focus:border-bright-red'
+                    : 'border-borders/60 focus:border-primary-red'
+                }`}
               />
             </div>
+            {nameError && (
+              <p id="name-error" className="text-xs text-bright-red mt-1.5 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{nameError}</span>
+              </p>
+            )}
           </div>
 
+          {/* Email Address */}
           <div>
-            <label className="block text-xs font-semibold text-secondary-text uppercase tracking-wider mb-2">
+            <label
+              htmlFor="register-email"
+              className="block text-xs font-semibold text-secondary-text uppercase tracking-wider mb-2"
+            >
               Email Address
             </label>
             <div className="relative">
@@ -127,19 +227,38 @@ export const RegisterPage: React.FC = () => {
                 <Mail className="w-4 h-4" />
               </div>
               <input
+                id="register-email"
+                name="email"
                 type="email"
                 required
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => handleBlur('email')}
                 placeholder="you@example.com"
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-elevated-surface border border-borders/60 text-primary-text placeholder-secondary-text/50 text-sm focus:outline-none focus:border-primary-red transition"
+                aria-invalid={!!emailError}
+                aria-describedby={emailError ? 'email-error' : undefined}
+                className={`w-full pl-10 pr-4 py-2.5 rounded-xl bg-elevated-surface border text-primary-text placeholder-secondary-text/50 text-sm focus:outline-none transition ${
+                  emailError
+                    ? 'border-bright-red focus:border-bright-red'
+                    : 'border-borders/60 focus:border-primary-red'
+                }`}
               />
             </div>
+            {emailError && (
+              <p id="email-error" className="text-xs text-bright-red mt-1.5 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{emailError}</span>
+              </p>
+            )}
           </div>
 
+          {/* Password */}
           <div>
-            <label className="block text-xs font-semibold text-secondary-text uppercase tracking-wider mb-2">
+            <label
+              htmlFor="register-password"
+              className="block text-xs font-semibold text-secondary-text uppercase tracking-wider mb-2"
+            >
               Password
             </label>
             <div className="relative">
@@ -147,13 +266,22 @@ export const RegisterPage: React.FC = () => {
                 <Lock className="w-4 h-4" />
               </div>
               <input
+                id="register-password"
+                name="password"
                 type={showPassword ? 'text' : 'password'}
                 required
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onBlur={() => handleBlur('password')}
                 placeholder="At least 8 characters"
-                className="w-full pl-10 pr-11 py-2.5 rounded-xl bg-elevated-surface border border-borders/60 text-primary-text placeholder-secondary-text/50 text-sm focus:outline-none focus:border-primary-red transition"
+                aria-invalid={!!passwordError}
+                aria-describedby="password-rules"
+                className={`w-full pl-10 pr-11 py-2.5 rounded-xl bg-elevated-surface border text-primary-text placeholder-secondary-text/50 text-sm focus:outline-none transition ${
+                  passwordError
+                    ? 'border-bright-red focus:border-bright-red'
+                    : 'border-borders/60 focus:border-primary-red'
+                }`}
               />
               <button
                 type="button"
@@ -166,7 +294,10 @@ export const RegisterPage: React.FC = () => {
             </div>
 
             {/* Password strength checklist */}
-            <div className="mt-3 p-3 rounded-lg bg-elevated-surface/50 border border-borders/30 grid grid-cols-2 gap-1.5 text-xs text-secondary-text">
+            <div
+              id="password-rules"
+              className="mt-3 p-3 rounded-lg bg-elevated-surface/50 border border-borders/30 grid grid-cols-2 gap-1.5 text-xs text-secondary-text"
+            >
               <span className={`flex items-center gap-1.5 ${rules.length ? 'text-green-400' : ''}`}>
                 <CheckCircle2 className={`w-3.5 h-3.5 ${rules.length ? 'text-green-400' : 'text-borders'}`} />
                 8+ characters
@@ -190,8 +321,12 @@ export const RegisterPage: React.FC = () => {
             </div>
           </div>
 
+          {/* Confirm Password */}
           <div>
-            <label className="block text-xs font-semibold text-secondary-text uppercase tracking-wider mb-2">
+            <label
+              htmlFor="register-confirm-password"
+              className="block text-xs font-semibold text-secondary-text uppercase tracking-wider mb-2"
+            >
               Confirm Password
             </label>
             <div className="relative">
@@ -199,27 +334,43 @@ export const RegisterPage: React.FC = () => {
                 <Lock className="w-4 h-4" />
               </div>
               <input
-                type={showPassword ? 'text' : 'password'}
+                id="register-confirm-password"
+                name="confirmPassword"
+                type={showConfirmPassword ? 'text' : 'password'}
                 required
                 autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                onBlur={() => handleBlur('confirmPassword')}
                 placeholder="Confirm password"
-                className={`w-full pl-10 pr-4 py-2.5 rounded-xl bg-elevated-surface border text-primary-text placeholder-secondary-text/50 text-sm focus:outline-none transition ${
-                  confirmPassword && !doPasswordsMatch
+                aria-invalid={!!confirmError}
+                aria-describedby={confirmError ? 'confirm-error' : undefined}
+                className={`w-full pl-10 pr-11 py-2.5 rounded-xl bg-elevated-surface border text-primary-text placeholder-secondary-text/50 text-sm focus:outline-none transition ${
+                  confirmError
                     ? 'border-bright-red focus:border-bright-red'
                     : 'border-borders/60 focus:border-primary-red'
                 }`}
               />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-secondary-text hover:text-primary-text transition"
+                aria-label={showConfirmPassword ? 'Hide confirm password text' : 'Show confirm password text'}
+              >
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
-            {confirmPassword && !doPasswordsMatch && (
-              <p className="text-xs text-bright-red mt-1">Passwords do not match.</p>
+            {confirmError && (
+              <p id="confirm-error" className="text-xs text-bright-red mt-1.5 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{confirmError}</span>
+              </p>
             )}
           </div>
 
           <button
             type="submit"
-            disabled={isLoading || !isPasswordValid || !doPasswordsMatch}
+            disabled={isLoading || !isFormValid}
             className="w-full py-3 px-4 rounded-xl bg-primary-red hover:bg-bright-red text-white font-semibold text-sm shadow-lg shadow-primary-red/25 flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer mt-2"
           >
             {isLoading ? (

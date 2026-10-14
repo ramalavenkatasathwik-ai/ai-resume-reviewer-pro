@@ -8,7 +8,7 @@ export const authService = {
   async register(data: {
     email: string;
     password: string;
-    display_name?: string;
+    display_name: string;
   }): Promise<User> {
     const res = await apiClient.post<TokenResponse>('/api/auth/register', data);
     setAuthToken(res.data.access_token);

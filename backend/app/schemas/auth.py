@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import Optional, Any
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -26,12 +26,32 @@ def validate_password_strength(v: str) -> str:
 class UserRegisterRequest(BaseModel):
     email: str = Field(..., description="User email address")
     password: str = Field(..., min_length=8, max_length=128, description="User password")
-    display_name: Optional[str] = Field(None, max_length=100, description="Optional user display name")
+    display_name: str = Field(..., min_length=2, max_length=100, description="User full name")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Support 'full_name' or 'name' as aliases for 'display_name'
+            if "display_name" not in data or not data["display_name"]:
+                if "full_name" in data and data["full_name"]:
+                    data["display_name"] = data["full_name"]
+                elif "name" in data and data["name"]:
+                    data["display_name"] = data["name"]
+        return data
+
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, v: str) -> str:
+        clean = (v or "").strip()
+        if len(clean) < 2:
+            raise ValueError("Full name must be at least 2 characters long.")
+        return clean
 
     @field_validator("email")
     @classmethod
     def validate_email(cls, v: str) -> str:
-        clean = v.strip().lower()
+        clean = (v or "").strip().lower()
         if not clean or not EMAIL_REGEX.match(clean):
             raise ValueError("Please provide a valid email address.")
         return clean
