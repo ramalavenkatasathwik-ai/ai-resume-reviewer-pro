@@ -29,6 +29,20 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #FF7417;
   }
+
+  /* Custom Cursor: hide default OS pointer on fine pointers, preserve native text caret on inputs */
+  @media (pointer: fine) {
+    html.custom-cursor-active,
+    html.custom-cursor-active *:not(input):not(textarea):not([contenteditable="true"]) {
+      cursor: none !important;
+    }
+
+    html.custom-cursor-active input,
+    html.custom-cursor-active textarea,
+    html.custom-cursor-active [contenteditable="true"] {
+      cursor: text !important;
+    }
+  }
 }
 
 @layer utilities {
