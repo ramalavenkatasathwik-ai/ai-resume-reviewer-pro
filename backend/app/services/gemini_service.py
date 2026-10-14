@@ -31,6 +31,15 @@ class GeminiService:
     @classmethod
     def get_client(cls, api_key: Optional[str] = None) -> genai.Client:
         """Initializes a Google GenAI Client with server-side GEMINI_API_KEY or optional key."""
+        if settings.AI_EMERGENCY_DISABLE:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "error": "AI_SERVICE_SUSPENDED",
+                    "message": "AI analysis services are temporarily paused by system administration.",
+                },
+            )
+
         effective_key = (api_key or settings.GEMINI_API_KEY or "").strip()
         if not effective_key:
             raise HTTPException(
@@ -64,6 +73,9 @@ class GeminiService:
             Tuple of (is_valid: bool, model_used: str, message: str)
         """
         model = cls.resolve_model(model_name)
+        if settings.AI_EMERGENCY_DISABLE:
+            return False, model, "AI services are temporarily suspended by system administration."
+
         effective_key = (api_key or settings.GEMINI_API_KEY or "").strip()
         if not effective_key:
             return False, model, "Server-side Google Gemini API key is not configured."
@@ -93,6 +105,21 @@ class GeminiService:
             return False, model, "Validation request failed due to an unexpected upstream error."
 
     @classmethod
+    def sanitize_untrusted_input(cls, text: str) -> str:
+        """Sanitizes untrusted candidate or job description text against delimiter injection and bounds length."""
+        if not text:
+            return ""
+        # Neutralize delimiter breakout attempts
+        sanitized = text.replace("<UNTRUSTED_CANDIDATE_DOCUMENT>", "[CONTAINER_OPEN]")
+        sanitized = sanitized.replace("</UNTRUSTED_CANDIDATE_DOCUMENT>", "[CONTAINER_CLOSE]")
+        sanitized = sanitized.replace("<UNTRUSTED_JOB_DESCRIPTION>", "[JOB_CONTAINER_OPEN]")
+        sanitized = sanitized.replace("</UNTRUSTED_JOB_DESCRIPTION>", "[JOB_CONTAINER_CLOSE]")
+        # Bound length to prevent buffer/token exhaustion
+        if len(sanitized) > settings.MAX_INPUT_TEXT_CHARS:
+            sanitized = sanitized[:settings.MAX_INPUT_TEXT_CHARS]
+        return sanitized
+
+    @classmethod
     async def analyze_resume(
         cls,
         resume_text: str,
@@ -115,6 +142,7 @@ class GeminiService:
             )
 
         client = cls.get_client(api_key)
+        safe_resume_text = cls.sanitize_untrusted_input(resume_text)
 
         prompt = f"""You are an elite executive recruiter and Applicant Tracking System (ATS) expert.
 Evaluate the candidate's resume strictly and specifically for the target role: "{clean_target_role}".
@@ -130,7 +158,7 @@ CRITICAL SECURITY AND EVALUATION DIRECTIVES:
 8. Output MUST strictly conform to the requested JSON schema.
 
 <UNTRUSTED_CANDIDATE_DOCUMENT>
-{resume_text}
+{safe_resume_text}
 </UNTRUSTED_CANDIDATE_DOCUMENT>
 """
 

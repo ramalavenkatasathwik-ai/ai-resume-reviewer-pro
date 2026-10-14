@@ -347,12 +347,50 @@ def delete_account(
         )
 
     user_id = current_user.id
-    db.query(AnalysisHistory).filter(AnalysisHistory.user_id == user_id).delete()
+
+    # 1. Purge physical files stored on disk/cloud for this user
+    try:
+        from app.models.stored_file import StoredFile
+        from app.services.storage_service import get_storage_provider
+
+        user_files = db.query(StoredFile).filter(StoredFile.user_id == user_id).all()
+        provider = get_storage_provider()
+        for uf in user_files:
+            try:
+                provider.delete(uf.storage_key)
+            except Exception as fe:
+                logger.warning("Failed to delete physical file %s during account deletion: %s", uf.storage_key, fe)
+    except Exception as e:
+        logger.warning("Error during physical file cleanup on account deletion: %s", type(e).__name__)
+
+    # 2. Delete all records owned by the user
+    try:
+        from app.models.resume import ResumeDocument, ResumeVersion
+        from app.models.job_match import JobMatchReport
+        from app.models.career_intelligence import CareerRoadmap, MultiRoleComparison, CareerProjectRecommendation
+        from app.models.stored_file import StoredFile
+
+        # Delete resume versions then resume documents
+        resumes = db.query(ResumeDocument).filter(ResumeDocument.user_id == user_id).all()
+        for r in resumes:
+            db.query(ResumeVersion).filter(ResumeVersion.resume_id == r.id).delete()
+        db.query(ResumeDocument).filter(ResumeDocument.user_id == user_id).delete()
+
+        db.query(AnalysisHistory).filter(AnalysisHistory.user_id == user_id).delete()
+        db.query(JobMatchReport).filter(JobMatchReport.user_id == user_id).delete()
+        db.query(CareerRoadmap).filter(CareerRoadmap.user_id == user_id).delete()
+        db.query(MultiRoleComparison).filter(MultiRoleComparison.user_id == user_id).delete()
+        db.query(CareerProjectRecommendation).filter(CareerProjectRecommendation.user_id == user_id).delete()
+        db.query(StoredFile).filter(StoredFile.user_id == user_id).delete()
+        db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user_id).delete()
+    except Exception as e:
+        logger.warning("Error during associated entity deletion: %s", type(e).__name__)
+
     db.delete(current_user)
     db.commit()
     _clear_auth_cookie(response)
 
-    logger.info("User account %s and associated personal data were permanently deleted.", user_id)
+    logger.info("User account %s and all associated personal data were permanently deleted.", user_id)
     return {
         "status": "success",
         "message": "Your account and all associated personal records have been permanently deleted.",

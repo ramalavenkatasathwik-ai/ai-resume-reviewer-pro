@@ -44,8 +44,14 @@ class Settings(BaseSettings):
         "gemini-1.5-pro",
     ]
 
+    # AI Cost Protection & Emergency Killswitch
+    AI_EMERGENCY_DISABLE: bool = False
+    AI_DAILY_QUOTA_PER_USER: int = 100
+    MAX_INPUT_TEXT_CHARS: int = 50000
+
     # Upload configuration
     MAX_UPLOAD_SIZE_MB: int = 10
+    MAX_UPLOAD_PAGES: int = 30
 
     # Rate limiting
     RATE_LIMIT_PER_MINUTE: int = 60

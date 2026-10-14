@@ -81,6 +81,7 @@ class JobMatchService:
         valid_jd = cls.validate_job_description(job_description)
         model = GeminiService.resolve_model(model_name)
         client = GeminiService.get_client(api_key)
+        safe_jd = GeminiService.sanitize_untrusted_input(valid_jd)
 
         prompt = f"""You are an expert technical recruiter and job analyst.
 Extract all explicit and inferred qualifications, skills, and attributes from the following job description.
@@ -99,7 +100,7 @@ CRITICAL SECURITY AND EXTRACTION DIRECTIVES:
 8. Output MUST strictly match the requested JSON schema.
 
 <UNTRUSTED_JOB_DESCRIPTION>
-{valid_jd}
+{safe_jd}
 </UNTRUSTED_JOB_DESCRIPTION>
 """
 

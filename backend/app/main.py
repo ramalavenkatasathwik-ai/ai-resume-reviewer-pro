@@ -46,15 +46,25 @@ def create_application() -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-    # Security Headers Middleware
+    # Security & Request Correlation Middleware
     @app.middleware("http")
-    async def add_security_headers(request: Request, call_next):
+    async def security_and_correlation_middleware(request: Request, call_next):
+        import uuid
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        request.state.request_id = request_id
+
         response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'; sandbox;"
+
+        if settings.is_production or request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+
         return response
 
     # CORS configuration with strict origins
@@ -69,13 +79,21 @@ def create_application() -> FastAPI:
     # Global handler for uncaught server errors to guarantee no credentials leak in tracebacks
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
-        logger.error("Unhandled exception processing request '%s': %s", request.url.path, type(exc).__name__)
+        request_id = getattr(request.state, "request_id", "unknown")
+        logger.error(
+            "Unhandled exception [req_id=%s] processing '%s': %s",
+            request_id,
+            request.url.path,
+            type(exc).__name__,
+        )
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={
                 "error": "INTERNAL_SERVER_ERROR",
                 "message": "An internal server error occurred. Please try again later.",
+                "request_id": request_id,
             },
+            headers={"X-Request-ID": request_id},
         )
 
     # Mount API routers at settings.API_PREFIX (/api)
@@ -88,13 +106,15 @@ def create_application() -> FastAPI:
 
     @app.get("/", tags=["Root"], include_in_schema=False)
     async def root():
-        return {
+        info = {
             "name": "AI Resume Reviewer Pro API",
             "version": "0.2.0",
-            "docs": "/docs",
             "health": f"{settings.API_PREFIX}/health",
             "models": f"{settings.API_PREFIX}/models",
         }
+        if not settings.is_production:
+            info["docs"] = "/docs"
+        return info
 
     return app
 

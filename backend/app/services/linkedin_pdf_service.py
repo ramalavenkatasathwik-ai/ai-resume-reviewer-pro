@@ -170,6 +170,15 @@ class LinkedInPdfService:
                 },
             )
 
+        if page_count > settings.MAX_UPLOAD_PAGES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "EXCESSIVE_PAGE_COUNT",
+                    "message": f"The PDF document exceeds the maximum allowed page count of {settings.MAX_UPLOAD_PAGES} pages (found {page_count}).",
+                },
+            )
+
         # 10. Extract text page by page preserving section boundaries
         extracted_pages: List[str] = []
         try:

@@ -3,7 +3,7 @@ import re
 from typing import Any
 
 # Regex pattern matching Google API keys (typically AIza followed by 35 chars)
-GEMINI_KEY_PATTERN = re.compile(r"AIza[0-9A-Za-z\-_]{35}", re.IGNORECASE)
+GEMINI_KEY_PATTERN = re.compile(r"AIza[0-9A-Za-z\-_]{30,45}", re.IGNORECASE)
 # Generic API key header patterns
 HEADER_KEY_PATTERN = re.compile(
     r"(x-gemini-api-key|authorization|bearer)[\s:=]+([^\s,;'\"]+)",

@@ -102,6 +102,15 @@ class ResumeService:
                 },
             )
 
+        if page_count > settings.MAX_UPLOAD_PAGES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error": "EXCESSIVE_PAGE_COUNT",
+                    "message": f"The PDF document exceeds the maximum allowed page count of {settings.MAX_UPLOAD_PAGES} pages (found {page_count}).",
+                },
+            )
+
         # 9. Extract text safely in-memory
         extracted_text_chunks = []
         try:
@@ -128,5 +137,9 @@ class ResumeService:
                     "message": "The PDF does not contain any extractable text (e.g. scanned image-only PDF without OCR).",
                 },
             )
+
+        # 10. Bounded input text protection
+        if len(extracted_text) > settings.MAX_INPUT_TEXT_CHARS:
+            extracted_text = extracted_text[:settings.MAX_INPUT_TEXT_CHARS]
 
         return content, extracted_text, page_count

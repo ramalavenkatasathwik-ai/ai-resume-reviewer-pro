@@ -73,6 +73,7 @@ class LinkedInService:
             )
 
         client = GeminiService.get_client(api_key)
+        safe_profile_content = GeminiService.sanitize_untrusted_input(profile_content)
 
         prompt = f"""You are a World-Class Executive Career Coach, Principal Tech Recruiter, and LinkedIn Profile Optimization Authority.
 Analyze the following candidate's LinkedIn profile thoroughly and specifically benchmark it for the target role: "{clean_target_role}".
@@ -97,7 +98,7 @@ STRICT EVALUATION & ETHICAL PRINCIPLES:
 8. Return a single strictly valid JSON object matching the requested schema.
 
 <UNTRUSTED_LINKEDIN_PROFILE>
-{profile_content}
+{safe_profile_content}
 </UNTRUSTED_LINKEDIN_PROFILE>
 
 JSON Output Schema Specification:
