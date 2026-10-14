@@ -325,22 +325,15 @@ describe('LinkedInAnalyzerPage Component', () => {
     expect(customInput).toHaveValue('Lead Robotics Engineer');
   });
 
-  it('shows error if Gemini API key is missing when clicking analyze', async () => {
+  it('displays the server-side AI engine status badge', () => {
     render(
       <MemoryRouter>
         <LinkedInAnalyzerPage />
       </MemoryRouter>
     );
 
-    const input = screen.getByPlaceholderText(/https:\/\/www.linkedin.com\/in\//i);
-    fireEvent.change(input, { target: { value: 'https://www.linkedin.com/in/john-doe' } });
-
-    const analyzeBtn = screen.getByRole('button', { name: /Analyze LinkedIn Profile/i });
-    fireEvent.click(analyzeBtn);
-
-    expect(
-      await screen.findByText(/Please enter your Google Gemini API key \(BYOK\) to proceed/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Server-Side AI Engine/i)).toBeInTheDocument();
+    expect(screen.getByText(/Managed Server-Side/i)).toBeInTheDocument();
   });
 
   it('shows error if URL is invalid when clicking analyze', async () => {
@@ -349,10 +342,6 @@ describe('LinkedInAnalyzerPage Component', () => {
         <LinkedInAnalyzerPage />
       </MemoryRouter>
     );
-
-    // Provide API key
-    const keyInput = screen.getByPlaceholderText(/Paste AIzaSy... key/i);
-    fireEvent.change(keyInput, { target: { value: 'AIzaSyValidKey123' } });
 
     // Set invalid URL
     const input = screen.getByPlaceholderText(/https:\/\/www.linkedin.com\/in\//i);
@@ -380,12 +369,9 @@ describe('LinkedInAnalyzerPage Component', () => {
       </MemoryRouter>
     );
 
-    // Provide valid URL and API key
+    // Provide valid URL
     const input = screen.getByPlaceholderText(/https:\/\/www.linkedin.com\/in\//i);
     fireEvent.change(input, { target: { value: 'https://www.linkedin.com/in/john-doe' } });
-
-    const keyInput = screen.getByPlaceholderText(/Paste AIzaSy... key/i);
-    fireEvent.change(keyInput, { target: { value: 'AIzaSyValidKey123' } });
 
     const analyzeBtn = screen.getByRole('button', { name: /Analyze LinkedIn Profile/i });
     fireEvent.click(analyzeBtn);
@@ -434,12 +420,9 @@ describe('LinkedInAnalyzerPage Component', () => {
       </MemoryRouter>
     );
 
-    // Set valid URL and API key
+    // Set valid URL
     const input = screen.getByPlaceholderText(/https:\/\/www.linkedin.com\/in\//i);
     fireEvent.change(input, { target: { value: 'https://www.linkedin.com/in/john-doe' } });
-
-    const keyInput = screen.getByPlaceholderText(/Paste AIzaSy... key/i);
-    fireEvent.change(keyInput, { target: { value: 'AIzaSyValidKey123' } });
 
     const analyzeBtn = screen.getByRole('button', { name: /Analyze LinkedIn Profile/i });
     fireEvent.click(analyzeBtn);
@@ -486,9 +469,6 @@ describe('LinkedInAnalyzerPage Component', () => {
     // Set valid URL and API key
     const input = screen.getByPlaceholderText(/https:\/\/www.linkedin.com\/in\//i);
     fireEvent.change(input, { target: { value: 'https://www.linkedin.com/in/johndoe' } });
-
-    const keyInput = screen.getByPlaceholderText(/Paste AIzaSy... key/i);
-    fireEvent.change(keyInput, { target: { value: 'AIzaSyValidKey123' } });
 
     const analyzeBtn = screen.getByRole('button', { name: /Analyze LinkedIn Profile/i });
     fireEvent.click(analyzeBtn);
@@ -553,9 +533,6 @@ describe('LinkedInAnalyzerPage Component', () => {
 
     const input = screen.getByPlaceholderText(/https:\/\/www.linkedin.com\/in\//i);
     fireEvent.change(input, { target: { value: 'https://www.linkedin.com/in/john-doe' } });
-
-    const keyInput = screen.getByPlaceholderText(/Paste AIzaSy... key/i);
-    fireEvent.change(keyInput, { target: { value: 'AIzaSyValidKey123' } });
 
     const analyzeBtn = screen.getByRole('button', { name: /Analyze LinkedIn Profile/i });
     fireEvent.click(analyzeBtn);
@@ -686,10 +663,6 @@ describe('LinkedInAnalyzerPage Component', () => {
     });
     fireEvent.change(fileInput, { target: { files: [file] } });
 
-    // Enter API key
-    const keyInput = screen.getByPlaceholderText(/Paste AIzaSy... key/i);
-    fireEvent.change(keyInput, { target: { value: 'AIzaSyValidKey123' } });
-
     // Click Analyze
     const analyzeBtn = screen.getByRole('button', { name: /Analyze LinkedIn Profile/i });
     fireEvent.click(analyzeBtn);
@@ -741,9 +714,6 @@ describe('LinkedInAnalyzerPage Component', () => {
       type: 'application/pdf',
     });
     fireEvent.change(fileInput, { target: { files: [file] } });
-
-    const keyInput = screen.getByPlaceholderText(/Paste AIzaSy... key/i);
-    fireEvent.change(keyInput, { target: { value: 'AIzaSyValidKey123' } });
 
     const analyzeBtn = screen.getByRole('button', { name: /Analyze LinkedIn Profile/i });
     fireEvent.click(analyzeBtn);

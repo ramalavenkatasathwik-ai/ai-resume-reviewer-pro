@@ -19,7 +19,6 @@ import { careerIntelligenceService } from '@/services/careerIntelligenceService'
 interface WritingAssistantPanelProps {
   initialResumeId?: string;
   initialRole?: string;
-  geminiApiKey?: string;
   onApplyText?: (section: WritingSection, text: string) => void;
 }
 
@@ -37,7 +36,6 @@ const SECTION_OPTIONS: Array<{ value: WritingSection; label: string }> = [
 export const WritingAssistantPanel: React.FC<WritingAssistantPanelProps> = ({
   initialResumeId,
   initialRole = 'AI Developer',
-  geminiApiKey = '',
   onApplyText,
 }) => {
   const [section, setSection] = useState<WritingSection>('summary');
@@ -59,16 +57,13 @@ export const WritingAssistantPanel: React.FC<WritingAssistantPanelProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const data = await careerIntelligenceService.getWritingSuggestions(
-        {
-          section,
-          target_role: targetRole,
-          current_text: currentText.trim() || undefined,
-          resume_id: initialResumeId,
-          instruction: instruction.trim() || undefined,
-        },
-        geminiApiKey
-      );
+      const data = await careerIntelligenceService.getWritingSuggestions({
+        section,
+        target_role: targetRole,
+        current_text: currentText.trim() || undefined,
+        resume_id: initialResumeId,
+        instruction: instruction.trim() || undefined,
+      });
       setResult(data);
       setStatusMap({});
       setEditingId(null);

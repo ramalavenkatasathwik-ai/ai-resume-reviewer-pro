@@ -71,8 +71,8 @@ class JobMatchService:
     @classmethod
     async def extract_requirements(
         cls,
-        api_key: str,
         job_description: str,
+        api_key: Optional[str] = None,
         job_title: Optional[str] = None,
         company_name: Optional[str] = None,
         model_name: Optional[str] = None,
@@ -80,7 +80,7 @@ class JobMatchService:
         """Extracts structured and typed requirements from job description text via Gemini."""
         valid_jd = cls.validate_job_description(job_description)
         model = GeminiService.resolve_model(model_name)
-        client = genai.Client(api_key=api_key)
+        client = GeminiService.get_client(api_key)
 
         prompt = f"""You are an expert technical recruiter and job analyst.
 Extract all explicit and inferred qualifications, skills, and attributes from the following job description.
@@ -162,14 +162,14 @@ CRITICAL SECURITY AND EXTRACTION DIRECTIVES:
     @classmethod
     async def compare_resume_to_job(
         cls,
-        api_key: str,
         requirements: JobRequirements,
         resume_version: ResumeVersion,
+        api_key: Optional[str] = None,
         model_name: Optional[str] = None,
     ) -> JobMatchComparison:
         """Compares resume evidence against requirements and computes explainable scores."""
         model = GeminiService.resolve_model(model_name)
-        client = genai.Client(api_key=api_key)
+        client = GeminiService.get_client(api_key)
 
         resume_json_str = json.dumps(resume_version.resume_data, indent=2)
 
@@ -309,15 +309,15 @@ CRITICAL SECURITY AND EVALUATION DIRECTIVES:
     @classmethod
     async def generate_recommendations(
         cls,
-        api_key: str,
         requirements: JobRequirements,
         comparison: JobMatchComparison,
         resume_version: ResumeVersion,
+        api_key: Optional[str] = None,
         model_name: Optional[str] = None,
     ) -> List[JobMatchRecommendation]:
         """Generates actionable recommendations with mandatory factual integrity enforcement."""
         model = GeminiService.resolve_model(model_name)
-        client = genai.Client(api_key=api_key)
+        client = GeminiService.get_client(api_key)
 
         prompt = f"""You are a certified executive resume coach.
 Generate actionable, high-impact recommendations to tailor the candidate's resume for the role: "{requirements.job_title}".

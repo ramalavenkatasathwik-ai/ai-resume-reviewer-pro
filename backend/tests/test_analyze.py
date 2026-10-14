@@ -7,13 +7,37 @@ from fastapi.testclient import TestClient
 from app.schemas.analysis import AnalysisResult
 
 
-def test_analyze_missing_api_key(client: TestClient, valid_pdf_bytes: bytes) -> None:
-    """Verify analyze endpoint rejects request with missing X-Gemini-API-Key with 401."""
-    files = {"file": ("resume.pdf", io.BytesIO(valid_pdf_bytes), "application/pdf")}
-    data = {"target_role": "Backend Engineer"}
-    response = client.post("/api/analyze", files=files, data=data)
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    assert "MISSING_API_KEY" in response.text
+def test_analyze_server_key_missing(client: TestClient, valid_pdf_bytes: bytes) -> None:
+    """Verify analyze endpoint returns 503 GEMINI_NOT_CONFIGURED when server key is not configured."""
+    with patch("app.core.security.settings.GEMINI_API_KEY", None):
+        files = {"file": ("resume.pdf", io.BytesIO(valid_pdf_bytes), "application/pdf")}
+        data = {"target_role": "Backend Engineer"}
+        response = client.post("/api/analyze", files=files, data=data)
+        assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+        assert "GEMINI_NOT_CONFIGURED" in response.text
+
+
+def test_analyze_without_client_header_success(
+    client: TestClient,
+    valid_pdf_bytes: bytes,
+    mock_analysis_dict: dict,
+) -> None:
+    """Verify resume analysis succeeds using server-side key without client supplying any key."""
+    expected_result = AnalysisResult.model_validate(mock_analysis_dict)
+
+    with patch(
+        "app.services.gemini_service.GeminiService.analyze_resume",
+        new_callable=AsyncMock,
+        return_value=expected_result,
+    ):
+        files = {"file": ("resume.pdf", io.BytesIO(valid_pdf_bytes), "application/pdf")}
+        data = {"target_role": "Senior Backend Engineer"}
+        response = client.post("/api/analyze", files=files, data=data)
+
+        assert response.status_code == status.HTTP_200_OK
+        res_json = response.json()
+        assert res_json["overall_score"] == 88
+        assert res_json["candidate_information"]["name"] == "Jane Doe"
 
 
 def test_analyze_invalid_extension(client: TestClient, valid_headers: dict) -> None:
@@ -50,7 +74,7 @@ def test_analyze_oversized_pdf(client: TestClient, valid_headers: dict) -> None:
     files = {"file": ("resume.pdf", io.BytesIO(large_content), "application/pdf")}
     data = {"target_role": "Backend Engineer"}
     response = client.post("/api/analyze", headers=valid_headers, files=files, data=data)
-    assert response.status_code == status.HTTP_413_CONTENT_TOO_LARGE
+    assert response.status_code == status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
     assert "FILE_TOO_LARGE" in response.text
 
 

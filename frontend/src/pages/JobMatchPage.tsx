@@ -32,7 +32,6 @@ import {
   RequirementMatchItem,
   TailoredResumeDraftResponse,
 } from '@/types/jobMatch';
-import { ApiKeyInput } from '@/components/ui/ApiKeyInput';
 import { ModelSelector } from '@/components/ui/ModelSelector';
 import { ScoreRing } from '@/components/ui/ScoreRing';
 import { Toast } from '@/components/ui/Toast';
@@ -61,9 +60,8 @@ export const JobMatchPage: React.FC = () => {
   const [jobDescription, setJobDescription] = useState<string>('');
   const [targetRole, setTargetRole] = useState<string>('');
 
-  // Gemini BYOK Credentials (strictly in-memory state)
-  const [apiKey, setApiKey] = useState<string>('');
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
+  // AI Configuration
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-4-argon');
 
   // Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
@@ -217,28 +215,20 @@ export const JobMatchPage: React.FC = () => {
       );
       return;
     }
-    if (!apiKey.trim()) {
-      showToast('Please provide your Gemini API key (BYOK).', 'error');
-      return;
-    }
-
     setIsAnalyzing(true);
     setCurrentReport(null);
     setTailoredDraft(null);
 
     try {
-      const report = await jobMatchService.analyzeJobMatch(
-        {
-          resume_id: selectedResumeId,
-          version_id: selectedVersionId || null,
-          job_description: jobDescription.trim(),
-          job_title: jobTitle.trim() || undefined,
-          company_name: companyName.trim() || undefined,
-          target_role: targetRole.trim() || undefined,
-          model: selectedModel,
-        },
-        apiKey.trim()
-      );
+      const report = await jobMatchService.analyzeJobMatch({
+        resume_id: selectedResumeId,
+        version_id: selectedVersionId || null,
+        job_description: jobDescription.trim(),
+        job_title: jobTitle.trim() || undefined,
+        company_name: companyName.trim() || undefined,
+        target_role: targetRole.trim() || undefined,
+        model: selectedModel,
+      });
 
       setCurrentReport(report);
       // Pre-select high-priority recommendations by default
@@ -780,20 +770,12 @@ export const JobMatchPage: React.FC = () => {
                     selectedModel={selectedModel}
                     onChange={setSelectedModel}
                     models={[
+                      'gemini-4-argon',
                       'gemini-2.5-flash',
                       'gemini-2.0-flash',
                       'gemini-1.5-flash',
                       'gemini-1.5-pro',
                     ]}
-                  />
-                </div>
-
-                {/* Gemini BYOK Key Input */}
-                <div>
-                  <ApiKeyInput
-                    value={apiKey}
-                    onChange={setApiKey}
-                    selectedModel={selectedModel}
                   />
                 </div>
 

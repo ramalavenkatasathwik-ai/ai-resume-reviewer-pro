@@ -33,10 +33,11 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
     ]
 
-    # BYOK LLM Configuration
-    # Supported and confirmed GA Gemini models
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    # Server-Side Gemini LLM Configuration (Shared Admin Key)
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-4-argon"
     SUPPORTED_MODELS: List[str] = [
+        "gemini-4-argon",
         "gemini-2.5-flash",
         "gemini-2.0-flash",
         "gemini-1.5-flash",
@@ -123,6 +124,10 @@ class Settings(BaseSettings):
         if provider == "smtp":
             return bool(self.SMTP_HOST and self.SMTP_PORT)
         return False
+
+    @property
+    def is_gemini_configured(self) -> bool:
+        return bool(self.GEMINI_API_KEY and self.GEMINI_API_KEY.strip())
 
     @property
     def max_upload_size_bytes(self) -> int:

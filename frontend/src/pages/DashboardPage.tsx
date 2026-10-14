@@ -15,7 +15,6 @@ import {
   MapPin,
 } from 'lucide-react';
 import { FileDropzone } from '@/components/ui/FileDropzone';
-import { ApiKeyInput } from '@/components/ui/ApiKeyInput';
 import { ModelSelector } from '@/components/ui/ModelSelector';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { SecondaryButton } from '@/components/ui/SecondaryButton';
@@ -45,14 +44,7 @@ export const DashboardPage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [targetRole, setTargetRole] = useState<string>('Senior Software Engineer');
   const [customRoleMode, setCustomRoleMode] = useState<boolean>(false);
-  const [apiKey, setApiKey] = useState<string>(() => {
-    try {
-      return localStorage.getItem('gemini_api_key') || '';
-    } catch {
-      return '';
-    }
-  });
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-4-argon');
   const [availableModels, setAvailableModels] = useState<string[]>([
     'gemini-2.5-flash',
     'gemini-1.5-flash',
@@ -82,15 +74,6 @@ export const DashboardPage: React.FC = () => {
       });
   }, []);
 
-  const handleApiKeyChange = (key: string) => {
-    setApiKey(key);
-    try {
-      localStorage.setItem('gemini_api_key', key);
-    } catch {
-      // ignore
-    }
-  };
-
   const handleModelChange = (model: string) => {
     setSelectedModel(model);
     try {
@@ -108,11 +91,6 @@ export const DashboardPage: React.FC = () => {
       return;
     }
 
-    if (!apiKey || apiKey.trim().length === 0) {
-      setError('Please enter your Google Gemini API key to run the analysis.');
-      return;
-    }
-
     if (!targetRole || targetRole.trim().length === 0) {
       setError('Please specify a target role to benchmark your resume against.');
       return;
@@ -124,7 +102,6 @@ export const DashboardPage: React.FC = () => {
       const data = await resumeService.analyzeResume(
         file,
         targetRole.trim(),
-        apiKey.trim(),
         selectedModel
       );
       setResult(data);
@@ -304,16 +281,18 @@ ${result.missing_skills.map((m) => `• ${m}`).join('\n')}`;
                 <span className="w-5 h-5 rounded-full bg-[#1C1C23] border border-[#303038] text-[#FF7417] flex items-center justify-center text-xs font-bold">
                   3
                 </span>
-                Gemini BYOK Engine
+                AI Engine & Model Selection
               </label>
-              <span className="text-[11px] text-[#A1A1AA]">Zero server storage</span>
+              <span className="text-[11px] text-emerald-400">Server-side managed</span>
             </div>
 
-            <ApiKeyInput
-              value={apiKey}
-              onChange={handleApiKeyChange}
-              selectedModel={selectedModel}
-            />
+            <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#1C1C23] border border-[#303038] text-xs">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[#F7F7FA] font-medium">Server-Side AI Active</span>
+              </div>
+              <span className="text-[11px] text-emerald-400 font-mono font-medium">Managed Server-Side</span>
+            </div>
 
             <ModelSelector
               models={availableModels}
@@ -330,18 +309,12 @@ ${result.missing_skills.map((m) => `• ${m}`).join('\n')}`;
               size="lg"
               onClick={handleAnalyze}
               isLoading={isLoading}
-              disabled={!file || !apiKey}
+              disabled={!file || isLoading}
               className="w-full justify-center shadow-lg shadow-[#C91432]/25"
             >
               <Sparkles className="w-4 h-4 text-white" />
               <span>{isLoading ? 'Analyzing Resume...' : 'Analyze Resume'}</span>
             </PrimaryButton>
-
-            {!apiKey && (
-              <p className="mt-2 text-center text-[11px] text-amber-400">
-                Please provide your Google Gemini API key above to initiate analysis.
-              </p>
-            )}
           </div>
         </div>
 

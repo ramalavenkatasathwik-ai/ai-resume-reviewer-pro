@@ -60,7 +60,7 @@ describe('DashboardPage Component (Resume Analyzer)', () => {
     expect(customInput).toHaveValue('Principal Solutions Architect');
   });
 
-  it('shows error banner or disabled state when trying to analyze without a file or API key', async () => {
+  it('shows error banner or disabled state when trying to analyze without a file', async () => {
     render(
       <MemoryRouter>
         <DashboardPage />
@@ -109,10 +109,6 @@ describe('DashboardPage Component (Resume Analyzer)', () => {
         <DashboardPage />
       </MemoryRouter>
     );
-
-    // Provide API key
-    const keyInput = screen.getByPlaceholderText(/Paste your Google Gemini API key/i);
-    fireEvent.change(keyInput, { target: { value: 'AIzaSyTestKey123' } });
 
     // Upload file via hidden input
     const file = new File(['test pdf content'], 'my_resume.pdf', { type: 'application/pdf' });

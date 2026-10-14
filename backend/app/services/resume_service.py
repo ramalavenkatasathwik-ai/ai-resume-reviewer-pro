@@ -51,7 +51,7 @@ class ResumeService:
         # 4. Check file size limits
         if file_size > settings.max_upload_size_bytes:
             raise HTTPException(
-                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail={
                     "error": "FILE_TOO_LARGE",
                     "message": f"File size exceeds the maximum allowed limit of {settings.MAX_UPLOAD_SIZE_MB} MB.",

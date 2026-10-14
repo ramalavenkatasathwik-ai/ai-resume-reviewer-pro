@@ -12,7 +12,7 @@ export const Footer: React.FC = () => {
           <span>&bull;</span>
           <span className="inline-flex items-center gap-1 text-[#FF9B45]">
             <ShieldCheck className="w-3 h-3" />
-            BYOK Privacy Architecture
+            Enterprise AI Privacy Architecture
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-[#A1A1AA] font-mono text-[11px]">

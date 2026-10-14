@@ -34,54 +34,67 @@ def get_gemini_api_key(
     x_gemini_api_key: Optional[str] = Header(
         None,
         alias="X-Gemini-API-Key",
-        description="User-provided Google Gemini API Key (BYOK)",
+        description="Optional client-provided Google Gemini API Key fallback",
     ),
 ) -> str:
-    """Dependency that extracts and validates the request-scoped Gemini API key.
+    """Dependency that resolves the active server-side or request-scoped Gemini API key.
     
-    Security guarantees:
-    - Never stored on disk or in database.
-    - Never logged or returned in responses.
-    - Disallowed from falling back to any server-side secret.
+    Architecture & Security:
+    - Primary source: Server-side configured GEMINI_API_KEY from environment variables.
+    - Fallback source: Client-provided X-Gemini-API-Key header (for automated testing or admin override).
+    - If neither is configured, raises safe HTTP 503 SERVICE_UNAVAILABLE.
+    - Never logged, persisted, or returned in responses.
     """
-    if not x_gemini_api_key or not x_gemini_api_key.strip():
+    if x_gemini_api_key is not None:
+        key = x_gemini_api_key.strip()
+        if not key:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": "MISSING_API_KEY", "message": "X-Gemini-API-Key header cannot be empty."},
+            )
+        if not GEMINI_KEY_REGEX.match(key):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "INVALID_API_KEY_FORMAT", "message": "API key format is invalid."},
+            )
+        return key
+
+    key = (settings.GEMINI_API_KEY or "").strip()
+    if not key:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
-                "error": "MISSING_API_KEY",
-                "message": "A user-provided Gemini API key is required via the 'X-Gemini-API-Key' header.",
+                "error": "GEMINI_NOT_CONFIGURED",
+                "message": "AI service is currently unavailable. The server-side Gemini API key has not been configured by the administrator.",
             },
         )
-
-    clean_key = x_gemini_api_key.strip()
-
-    # Reject keys containing control characters, spaces, or invalid syntax
-    if "\n" in clean_key or "\r" in clean_key or len(clean_key) < 20 or len(clean_key) > 100:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": "INVALID_KEY_FORMAT",
-                "message": "The provided Gemini API key has an invalid format or length.",
-            },
-        )
-
-    return clean_key
+    return key
 
 
 def get_optional_gemini_api_key(
     x_gemini_api_key: Optional[str] = Header(
         None,
         alias="X-Gemini-API-Key",
-        description="Optional user-provided Google Gemini API Key (BYOK)",
+        description="Optional client-provided Google Gemini API Key fallback",
     ),
 ) -> Optional[str]:
-    """Dependency that extracts Gemini API key if present, returning None if omitted."""
-    if not x_gemini_api_key or not x_gemini_api_key.strip():
-        return None
-    clean_key = x_gemini_api_key.strip()
-    if "\n" in clean_key or "\r" in clean_key or len(clean_key) < 20 or len(clean_key) > 100:
-        return None
-    return clean_key
+    """Dependency that returns server-side GEMINI_API_KEY or optional header key."""
+    if x_gemini_api_key is not None:
+        key = x_gemini_api_key.strip()
+        if not key:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={"error": "MISSING_API_KEY", "message": "X-Gemini-API-Key header cannot be empty."},
+            )
+        if not GEMINI_KEY_REGEX.match(key):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "INVALID_API_KEY_FORMAT", "message": "API key format is invalid."},
+            )
+        return key
+
+    key = (settings.GEMINI_API_KEY or "").strip()
+    return key if key else None
 
 
 def mask_api_key(key: str) -> str:

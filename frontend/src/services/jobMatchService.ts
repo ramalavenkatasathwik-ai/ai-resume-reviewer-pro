@@ -16,17 +16,11 @@ export const jobMatchService = {
    * Parses qualifications, required/preferred technical skills, and keywords from a pasted job description.
    */
   async extractRequirements(
-    payload: JobRequirementsExtractRequest,
-    apiKey: string
+    payload: JobRequirementsExtractRequest
   ): Promise<JobRequirements> {
     const res = await apiClient.post<JobRequirements>(
       '/api/job-matches/extract',
-      payload,
-      {
-        headers: {
-          'X-Gemini-API-Key': apiKey,
-        },
-      }
+      payload
     );
     return res.data;
   },
@@ -36,17 +30,11 @@ export const jobMatchService = {
    * generating explainable scores and tailored recommendations.
    */
   async analyzeJobMatch(
-    payload: JobMatchAnalyzeRequest,
-    apiKey: string
+    payload: JobMatchAnalyzeRequest
   ): Promise<JobMatchReportDetail> {
     const res = await apiClient.post<JobMatchReportDetail>(
       '/api/job-matches/analyze',
-      payload,
-      {
-        headers: {
-          'X-Gemini-API-Key': apiKey,
-        },
-      }
+      payload
     );
     return res.data;
   },

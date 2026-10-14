@@ -1,7 +1,5 @@
-import axios from 'axios';
+import apiClient from '@/lib/axios';
 import { LinkedInAnalysisResult } from '@/types/linkedin';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export const linkedinService = {
   /**
@@ -83,7 +81,7 @@ export const linkedinService = {
   },
 
   /**
-   * Evaluates a LinkedIn profile via URL using BYOK header.
+   * Evaluates a LinkedIn profile via URL using server-side Gemini AI.
    */
   async analyzeUrl(
     payload: {
@@ -93,8 +91,7 @@ export const linkedinService = {
       model?: string;
       profile_text?: string;
       fallback_text?: string;
-    },
-    apiKey: string
+    }
   ): Promise<LinkedInAnalysisResult> {
     const body = {
       linkedin_url: payload.linkedin_url || payload.url,
@@ -104,26 +101,19 @@ export const linkedinService = {
       profile_text: payload.profile_text || payload.fallback_text,
       fallback_text: payload.fallback_text || payload.profile_text,
     };
-    const response = await axios.post<LinkedInAnalysisResult>(
-      `${API_BASE_URL}/api/linkedin/analyze-url`,
-      body,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Gemini-API-Key': apiKey,
-        },
-      }
+    const response = await apiClient.post<LinkedInAnalysisResult>(
+      '/api/linkedin/analyze-url',
+      body
     );
     return response.data;
   },
 
   /**
-   * Evaluates a LinkedIn profile via 'Save to PDF' export using BYOK header.
+   * Evaluates a LinkedIn profile via 'Save to PDF' export using server-side Gemini AI.
    */
   async analyzePdf(
     file: File,
     targetRole: string,
-    apiKey: string,
     model?: string,
     profileUrl?: string
   ): Promise<LinkedInAnalysisResult> {
@@ -133,13 +123,12 @@ export const linkedinService = {
     if (model) formData.append('model', model);
     if (profileUrl) formData.append('profile_url', profileUrl);
 
-    const response = await axios.post<LinkedInAnalysisResult>(
-      `${API_BASE_URL}/api/linkedin/analyze-pdf`,
+    const response = await apiClient.post<LinkedInAnalysisResult>(
+      '/api/linkedin/analyze-pdf',
       formData,
       {
         headers: {
           'Content-Type': 'multipart/form-data',
-          'X-Gemini-API-Key': apiKey,
         },
       }
     );
@@ -147,7 +136,7 @@ export const linkedinService = {
   },
 
   /**
-   * Evaluates pasted LinkedIn profile text using BYOK header.
+   * Evaluates pasted LinkedIn profile text using server-side Gemini AI.
    */
   async analyzeText(
     payload: {
@@ -155,18 +144,11 @@ export const linkedinService = {
       target_role: string;
       model?: string;
       profile_url?: string;
-    },
-    apiKey: string
+    }
   ): Promise<LinkedInAnalysisResult> {
-    const response = await axios.post<LinkedInAnalysisResult>(
-      `${API_BASE_URL}/api/linkedin/analyze-text`,
-      payload,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Gemini-API-Key': apiKey,
-        },
-      }
+    const response = await apiClient.post<LinkedInAnalysisResult>(
+      '/api/linkedin/analyze-text',
+      payload
     );
     return response.data;
   },
@@ -176,8 +158,8 @@ export const linkedinService = {
    */
   async getSupportedModels(): Promise<{ models: string[]; default_model: string }> {
     try {
-      const response = await axios.get<{ models: Array<{ id: string }>; default_model: string }>(
-        `${API_BASE_URL}/api/models`
+      const response = await apiClient.get<{ models: Array<{ id: string }>; default_model: string }>(
+        '/api/models'
       );
       return {
         models: response.data.models.map((m) => m.id),
@@ -185,25 +167,19 @@ export const linkedinService = {
       };
     } catch {
       return {
-        models: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
-        default_model: 'gemini-2.5-flash',
+        models: ['gemini-4-argon', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+        default_model: 'gemini-4-argon',
       };
     }
   },
 
   /**
-   * Validates user API key with minimal probe.
+   * Validates server AI service connectivity.
    */
-  async validateKey(apiKey: string, model?: string): Promise<{ valid: boolean; message: string }> {
-    const response = await axios.post<{ valid: boolean; message: string }>(
-      `${API_BASE_URL}/api/keys/validate`,
-      { model },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Gemini-API-Key': apiKey,
-        },
-      }
+  async validateKey(model?: string): Promise<{ valid: boolean; message: string }> {
+    const response = await apiClient.post<{ valid: boolean; message: string }>(
+      '/api/keys/validate',
+      { model }
     );
     return response.data;
   },

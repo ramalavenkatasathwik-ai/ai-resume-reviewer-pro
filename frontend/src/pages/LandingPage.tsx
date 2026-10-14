@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   FileText,
@@ -33,17 +33,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   lastChecked,
   onRefresh,
 }) => {
-  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
-
-  useEffect(() => {
-    try {
-      const key = localStorage.getItem('gemini_api_key');
-      setHasApiKey(Boolean(key && key.trim().length > 0));
-    } catch {
-      setHasApiKey(false);
-    }
-  }, []);
-
   return (
     <div className="space-y-12 sm:space-y-16 py-4 sm:py-8 max-w-6xl mx-auto">
       {/* Hero Section */}
@@ -68,8 +57,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </p>
 
         <p className="mt-3 text-sm sm:text-base text-[#A1A1AA]/80 max-w-2xl mx-auto">
-          Benchmark resumes and LinkedIn profiles against real industry expectations using Google Gemini.
-          Private BYOK security guarantees your API keys and profile documents never persist on our servers.
+          Benchmark resumes and LinkedIn profiles against real industry expectations using centralized Google Gemini AI.
+          Enterprise privacy architecture guarantees your profile documents are processed securely in memory without persistent retention.
         </p>
 
         {/* CTA Buttons */}
@@ -106,25 +95,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </Link>
         </div>
 
-        {/* Quick API Key status banner */}
+        {/* Quick Server-Side AI Engine status banner */}
         <div className="mt-6 flex items-center justify-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#141419] border border-[#303038] text-xs">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                hasApiKey ? 'bg-emerald-500' : 'bg-amber-500'
-              }`}
-            />
-            <span className="text-[#A1A1AA]">Gemini BYOK Key:</span>
-            {hasApiKey ? (
-              <span className="text-emerald-400 font-semibold">Configured</span>
-            ) : (
-              <Link
-                to="/settings"
-                className="text-[#FF7417] hover:underline font-semibold"
-              >
-                Not configured &mdash; Add key &rarr;
-              </Link>
-            )}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#141419] border border-[#303038] text-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[#A1A1AA]">AI Engine:</span>
+            <span className="text-white font-mono font-semibold">gemini-4-argon</span>
+            <span className="text-[#A1A1AA]">&bull;</span>
+            <span className="text-emerald-400 font-semibold">Server-Side Managed</span>
           </div>
         </div>
       </section>
@@ -349,10 +327,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <ShieldCheck className="w-5 h-5" />
           </div>
           <h3 className="font-bold text-[#F7F7FA] text-base mb-2">
-            Zero-Storage BYOK Privacy
+            Enterprise Privacy Guarantee
           </h3>
           <p className="text-xs text-[#A1A1AA] leading-relaxed">
-            Your personal Google Gemini API key and uploaded documents are handled in memory and never stored in backend database tables.
+            The centralized Google Gemini API key is configured server-side. Uploaded documents are processed in memory and never stored in persistent database tables.
           </p>
         </div>
 
@@ -361,10 +339,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <Cpu className="w-5 h-5" />
           </div>
           <h3 className="font-bold text-[#F7F7FA] text-base mb-2">
-            Multi-Model Support
+            Latest Gemini 4 Frontier Model
           </h3>
           <p className="text-xs text-[#A1A1AA] leading-relaxed">
-            Choose between Gemini 2.5 Flash for high-speed analyses or Gemini 1.5 Pro for deep technical critiques.
+            Powered by default by Gemini 4 Argon for high-accuracy ATS and LinkedIn profile evaluation, with automated fallbacks.
           </p>
         </div>
       </section>

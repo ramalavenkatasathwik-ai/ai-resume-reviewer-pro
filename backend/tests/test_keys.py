@@ -3,13 +3,15 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 
-def test_validate_key_missing_header(client: TestClient) -> None:
-    """Verify endpoint rejects request without X-Gemini-API-Key header with 401."""
-    response = client.post("/api/keys/validate", json={})
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    data = response.json()
-    assert "error" in data["detail"]
-    assert data["detail"]["error"] == "MISSING_API_KEY"
+def test_validate_key_server_unconfigured(client: TestClient) -> None:
+    """Verify endpoint reports valid: False when server key is not configured and no header is provided."""
+    with patch("app.core.security.settings.GEMINI_API_KEY", None), \
+         patch("app.services.gemini_service.settings.GEMINI_API_KEY", None):
+        response = client.post("/api/keys/validate", json={})
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["valid"] is False
+        assert "not configured" in data["message"].lower()
 
 
 def test_validate_key_empty_header(client: TestClient) -> None:

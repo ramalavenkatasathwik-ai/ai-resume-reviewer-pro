@@ -87,10 +87,10 @@ async def analyze_linkedin_url(
 
     # 4. Execute analysis with Gemini
     result = await LinkedInService.analyze_profile(
-        api_key=api_key,
         profile_content=acquisition.content,
         target_role=payload.target_role,
         input_type="url",
+        api_key=api_key,
         profile_url=normalized_url,
         model_name=payload.model,
         extra_limitations=acquisition.limitations,
@@ -163,10 +163,10 @@ async def analyze_linkedin_pdf(
 
     # 3. Execute analysis with Gemini
     result = await LinkedInService.analyze_profile(
-        api_key=api_key,
         profile_content=profile_text,
         target_role=clean_target_role,
         input_type="pdf",
+        api_key=api_key,
         profile_url=normalized_url,
         model_name=model,
         original_filename=file.filename or "linkedin_profile.pdf",
@@ -234,10 +234,10 @@ async def analyze_linkedin_text(
 
     # Execute analysis with Gemini
     result = await LinkedInService.analyze_profile(
-        api_key=api_key,
         profile_content=payload.profile_text.strip(),
         target_role=payload.target_role,
         input_type="text",
+        api_key=api_key,
         profile_url=normalized_url,
         model_name=payload.model,
     )

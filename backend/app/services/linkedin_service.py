@@ -48,10 +48,10 @@ class LinkedInService:
     @classmethod
     async def analyze_profile(
         cls,
-        api_key: str,
         profile_content: str,
         target_role: str,
         input_type: str,
+        api_key: Optional[str] = None,
         profile_url: Optional[str] = None,
         model_name: Optional[str] = None,
         extra_limitations: Optional[List[str]] = None,
@@ -72,7 +72,7 @@ class LinkedInService:
                 },
             )
 
-        client = genai.Client(api_key=api_key)
+        client = GeminiService.get_client(api_key)
 
         prompt = f"""You are a World-Class Executive Career Coach, Principal Tech Recruiter, and LinkedIn Profile Optimization Authority.
 Analyze the following candidate's LinkedIn profile thoroughly and specifically benchmark it for the target role: "{clean_target_role}".

@@ -445,27 +445,30 @@ def test_analyze_pdf_multipage_handling(client: TestClient, valid_headers: dict)
 # ---------------------------------------------------------------------------
 
 def test_analyze_pdf_missing_api_key(client: TestClient, valid_pdf_bytes: bytes):
-    """Verifies 401 Unauthorized when X-Gemini-API-Key header is absent."""
-    response = client.post(
-        "/api/linkedin/analyze-pdf",
-        data={"target_role": "AI Developer"},
-        files={"file": ("profile.pdf", io.BytesIO(valid_pdf_bytes), "application/pdf")},
-    )
-    assert response.status_code == 401
-    assert "MISSING_API_KEY" in response.text
+    """Verifies 503 Service Unavailable when server Gemini key is not configured."""
+    with patch("app.core.security.settings.GEMINI_API_KEY", None):
+        response = client.post(
+            "/api/linkedin/analyze-pdf",
+            data={"target_role": "AI Developer"},
+            files={"file": ("profile.pdf", io.BytesIO(valid_pdf_bytes), "application/pdf")},
+        )
+        assert response.status_code == 503
+        assert "GEMINI_NOT_CONFIGURED" in response.text
 
 
 def test_analyze_pdf_invalid_gemini_key(client: TestClient, valid_pdf_bytes: bytes):
     """Verifies 401 Unauthorized when Gemini rejects key as invalid."""
     with patch("google.genai.Client") as mock_client_cls:
         mock_client = MagicMock()
-        err = genai_errors.APIError(401, "API_KEY_INVALID", None)
+        err = genai_errors.APIError.__new__(genai_errors.APIError)
+        err.code = 401
+        err.message = "API_KEY_INVALID"
         mock_client.models.generate_content.side_effect = err
         mock_client_cls.return_value = mock_client
 
         response = client.post(
             "/api/linkedin/analyze-pdf",
-            headers={"X-Gemini-API-Key": "AIzaSyInvalidKeyHere12345678"},
+            headers={"X-Gemini-API-Key": "AIzaSyInvalidKeyHere123456789012345678"},
             data={"target_role": "AI Developer"},
             files={"file": ("profile.pdf", io.BytesIO(valid_pdf_bytes), "application/pdf")},
         )
@@ -477,7 +480,9 @@ def test_analyze_pdf_gemini_rate_limit(client: TestClient, valid_headers: dict, 
     """Verifies 429 Too Many Requests when Gemini rate limit is hit."""
     with patch("google.genai.Client") as mock_client_cls, patch("time.sleep"):
         mock_client = MagicMock()
-        err = genai_errors.APIError(429, "RESOURCE_EXHAUSTED", None)
+        err = genai_errors.APIError.__new__(genai_errors.APIError)
+        err.code = 429
+        err.message = "RESOURCE_EXHAUSTED"
         mock_client.models.generate_content.side_effect = err
         mock_client_cls.return_value = mock_client
 
@@ -495,7 +500,9 @@ def test_analyze_pdf_gemini_upstream_error(client: TestClient, valid_headers: di
     """Verifies 502 Bad Gateway when Gemini upstream encounters error."""
     with patch("google.genai.Client") as mock_client_cls, patch("time.sleep"):
         mock_client = MagicMock()
-        err = genai_errors.APIError(500, "Internal Error", None)
+        err = genai_errors.APIError.__new__(genai_errors.APIError)
+        err.code = 500
+        err.message = "Internal Error"
         mock_client.models.generate_content.side_effect = err
         mock_client_cls.return_value = mock_client
 

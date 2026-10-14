@@ -20,17 +20,11 @@ export const careerIntelligenceService = {
    * Generates a role-specific resume draft from an existing resume.
    */
   async generateRoleVariant(
-    payload: GenerateRoleVariantRequest,
-    apiKey?: string
+    payload: GenerateRoleVariantRequest
   ): Promise<RoleVariantDraftResponse> {
-    const headers: Record<string, string> = {};
-    if (apiKey?.trim()) {
-      headers['X-Gemini-API-Key'] = apiKey.trim();
-    }
     const res = await apiClient.post<RoleVariantDraftResponse>(
       '/api/career/variants/generate',
-      payload,
-      { headers }
+      payload
     );
     return res.data;
   },
@@ -59,17 +53,11 @@ export const careerIntelligenceService = {
    * Generates refined writing suggestions for any of the 8 supported career writing sections.
    */
   async getWritingSuggestions(
-    payload: WritingSuggestionRequest,
-    apiKey?: string
+    payload: WritingSuggestionRequest
   ): Promise<WritingSuggestionResponse> {
-    const headers: Record<string, string> = {};
-    if (apiKey?.trim()) {
-      headers['X-Gemini-API-Key'] = apiKey.trim();
-    }
     const res = await apiClient.post<WritingSuggestionResponse>(
       '/api/career/writing/suggest',
-      payload,
-      { headers }
+      payload
     );
     return res.data;
   },
@@ -78,17 +66,11 @@ export const careerIntelligenceService = {
    * Generates a personalized career progression roadmap based on resume evidence and target role.
    */
   async generateRoadmap(
-    payload: GenerateRoadmapRequest,
-    apiKey?: string
+    payload: GenerateRoadmapRequest
   ): Promise<CareerRoadmapResponse> {
-    const headers: Record<string, string> = {};
-    if (apiKey?.trim()) {
-      headers['X-Gemini-API-Key'] = apiKey.trim();
-    }
     const res = await apiClient.post<CareerRoadmapResponse>(
       '/api/career/roadmap/generate',
-      payload,
-      { headers }
+      payload
     );
     return res.data;
   },
@@ -146,17 +128,11 @@ export const careerIntelligenceService = {
    * Recommends portfolio projects demonstrating in-demand competencies.
    */
   async recommendProjects(
-    payload: ProjectRecommendRequest,
-    apiKey?: string
+    payload: ProjectRecommendRequest
   ): Promise<ProjectRecommendResponse> {
-    const headers: Record<string, string> = {};
-    if (apiKey?.trim()) {
-      headers['X-Gemini-API-Key'] = apiKey.trim();
-    }
     const res = await apiClient.post<ProjectRecommendResponse>(
       '/api/career/projects/recommend',
-      payload,
-      { headers }
+      payload
     );
     return res.data;
   },

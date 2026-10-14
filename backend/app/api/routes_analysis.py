@@ -20,7 +20,7 @@ router = APIRouter(tags=["Analysis"])
     response_model=AnalysisResult,
     status_code=status.HTTP_200_OK,
     summary="Analyze Resume PDF against Target Role",
-    description="Uploads a resume PDF in-memory and evaluates it with Google Gemini using the caller's BYOK key.",
+    description="Uploads a resume PDF in-memory and evaluates it with Google Gemini using server-side AI configuration.",
 )
 @limiter.limit("10/minute")
 async def analyze_resume(
@@ -36,11 +36,11 @@ async def analyze_resume(
     # 1. Validate PDF and extract text in-memory
     _pdf_bytes, resume_text, _page_count = await ResumeService.validate_and_extract_pdf(file)
 
-    # 2. Execute analysis via Gemini using caller's ephemeral key
+    # 2. Execute analysis via Gemini using server-side key
     analysis_result = await GeminiService.analyze_resume(
-        api_key=api_key,
         resume_text=resume_text,
         target_role=target_role,
+        api_key=api_key,
         model_name=model,
     )
 

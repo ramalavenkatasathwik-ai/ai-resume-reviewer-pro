@@ -490,23 +490,25 @@ def test_analyze_text_insufficient_length(client: TestClient, valid_headers: dic
 # ---------------------------------------------------------------------------
 
 def test_analyze_missing_api_key_url_endpoint(client: TestClient):
-    """Ensures 401 Unauthorized when X-Gemini-API-Key header is absent on URL endpoint."""
-    response = client.post(
-        "/api/linkedin/analyze-url",
-        json={"linkedin_url": "https://www.linkedin.com/in/janedoe", "target_role": "AI Developer"},
-    )
-    assert response.status_code == 401
-    assert "MISSING_API_KEY" in response.text
+    """Ensures 503 Service Unavailable when server Gemini key is not configured."""
+    with patch("app.core.security.settings.GEMINI_API_KEY", None):
+        response = client.post(
+            "/api/linkedin/analyze-url",
+            json={"linkedin_url": "https://www.linkedin.com/in/janedoe", "target_role": "AI Developer"},
+        )
+        assert response.status_code == 503
+        assert "GEMINI_NOT_CONFIGURED" in response.text
 
 
 def test_analyze_missing_api_key_text_endpoint(client: TestClient):
-    """Ensures 401 Unauthorized when X-Gemini-API-Key header is absent on text endpoint."""
-    response = client.post(
-        "/api/linkedin/analyze-text",
-        json={"profile_text": "A" * 60, "target_role": "AI Developer"},
-    )
-    assert response.status_code == 401
-    assert "MISSING_API_KEY" in response.text
+    """Ensures 503 Service Unavailable when server Gemini key is not configured."""
+    with patch("app.core.security.settings.GEMINI_API_KEY", None):
+        response = client.post(
+            "/api/linkedin/analyze-text",
+            json={"profile_text": "A" * 60, "target_role": "AI Developer"},
+        )
+        assert response.status_code == 503
+        assert "GEMINI_NOT_CONFIGURED" in response.text
 
 
 def test_analyze_url_inaccessible_no_fallback_text_returns_422(client: TestClient, valid_headers: dict):
@@ -733,7 +735,9 @@ def test_analyze_gemini_rate_limit_mocked(client: TestClient, valid_headers: dic
     with patch("google.genai.Client") as mock_client_cls, \
          patch("time.sleep"):
         mock_client = MagicMock()
-        err = genai_errors.APIError(429, "Resource has been exhausted", None)
+        err = genai_errors.APIError.__new__(genai_errors.APIError)
+        err.code = 429
+        err.message = "Resource has been exhausted"
         mock_client.models.generate_content.side_effect = err
         mock_client_cls.return_value = mock_client
 
@@ -751,7 +755,9 @@ def test_analyze_gemini_upstream_error_mocked(client: TestClient, valid_headers:
     with patch("google.genai.Client") as mock_client_cls, \
          patch("time.sleep"):
         mock_client = MagicMock()
-        err = genai_errors.APIError(500, "Internal Server Error", None)
+        err = genai_errors.APIError.__new__(genai_errors.APIError)
+        err.code = 500
+        err.message = "Internal Server Error"
         mock_client.models.generate_content.side_effect = err
         mock_client_cls.return_value = mock_client
 

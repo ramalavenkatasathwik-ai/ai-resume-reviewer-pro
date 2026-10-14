@@ -51,8 +51,10 @@ services:
         value: https://ai-resume-reviewer-frontend.onrender.com
       - key: MAX_UPLOAD_SIZE_MB
         value: "10"
+      - key: GEMINI_API_KEY
+        sync: false
       - key: GEMINI_MODEL
-        value: gemini-2.5-flash
+        value: gemini-4-argon
       - key: STORAGE_PROVIDER
         value: local
       - key: STORAGE_LOCAL_DIR

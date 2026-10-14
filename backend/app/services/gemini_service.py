@@ -17,15 +17,30 @@ settings = get_settings()
 
 
 class GeminiService:
-    """Service handling all Google Gemini LLM interactions via the official Google GenAI SDK.
+    """Centralized service handling all Google Gemini LLM interactions via the official Google GenAI SDK.
     
     Security & Architecture Guarantees:
-    - BYOK request-scoped execution: Client is initialized per request using the user's ephemeral key.
-    - Zero key persistence: Keys are never saved to disk, DB, logs, or responses.
-    - Controlled model selection: Strictly enforced server-side allowlist.
+    - Server-side managed key: Key is loaded securely from backend configuration (GEMINI_API_KEY).
+    - Zero key persistence: Keys are never saved to disk, DB, logs, or client responses.
+    - Zero client exposure: Frontend never sees, manages, or handles API keys.
+    - Controlled model selection: Strictly enforced server-side allowlist (default: gemini-4-argon).
     - Exponential backoff: Limited retries for transient 429/503 errors only.
     - Sanitized error translation: Never exposes raw Google SDK tracebacks or tokens.
     """
+
+    @classmethod
+    def get_client(cls, api_key: Optional[str] = None) -> genai.Client:
+        """Initializes a Google GenAI Client with server-side GEMINI_API_KEY or optional key."""
+        effective_key = (api_key or settings.GEMINI_API_KEY or "").strip()
+        if not effective_key:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "error": "GEMINI_NOT_CONFIGURED",
+                    "message": "AI services are temporarily unavailable because the server Gemini API key has not been configured by the administrator.",
+                },
+            )
+        return genai.Client(api_key=effective_key)
 
     @classmethod
     def resolve_model(cls, model_name: Optional[str] = None) -> str:
@@ -36,21 +51,25 @@ class GeminiService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail={
                     "error": "UNSUPPORTED_MODEL",
-                    "message": f"Model '{chosen}' is not supported. Allowed models: {', '.join(settings.SUPPORTED_MODELS)}",
+                    "message": f"Model '{chosen}' is not supported. Supported models: {', '.join(settings.SUPPORTED_MODELS)}",
                 },
             )
         return chosen
 
     @classmethod
-    def validate_api_key(cls, api_key: str, model_name: Optional[str] = None) -> Tuple[bool, str, str]:
-        """Probes the user-provided Gemini API key with a minimal request to verify validity.
+    def validate_api_key(cls, api_key: Optional[str] = None, model_name: Optional[str] = None) -> Tuple[bool, str, str]:
+        """Probes the configured or provided Gemini API key with a minimal request to verify validity.
         
         Returns:
             Tuple of (is_valid: bool, model_used: str, message: str)
         """
         model = cls.resolve_model(model_name)
+        effective_key = (api_key or settings.GEMINI_API_KEY or "").strip()
+        if not effective_key:
+            return False, model, "Server-side Google Gemini API key is not configured."
+
         try:
-            client = genai.Client(api_key=api_key)
+            client = genai.Client(api_key=effective_key)
             # Minimal probe to verify authentication without consuming significant tokens
             client.models.generate_content(
                 model=model,
@@ -60,15 +79,15 @@ class GeminiService:
                     temperature=0.0,
                 ),
             )
-            return True, model, f"Successfully validated API key with {model}."
+            return True, model, f"Successfully validated AI service connection with {model}."
         except genai_errors.APIError as e:
             logger.warning("Gemini API key validation failed: code=%s", getattr(e, "code", None))
             code = getattr(e, "code", 400)
             if code in (400, 401, 403):
-                return False, model, "The provided Google Gemini API key is invalid, inactive, or unauthorized."
+                return False, model, "The server Google Gemini API key is invalid, inactive, or unauthorized."
             elif code == 429:
-                return False, model, "Google Gemini rate limit or quota exceeded for this API key."
-            return False, model, "Upstream Gemini service error during key validation."
+                return False, model, "Google Gemini rate limit or quota exceeded for the configured server key."
+            return False, model, "Upstream Gemini service error during key verification."
         except Exception as e:
             logger.warning("Unexpected error during key validation: %s", type(e).__name__)
             return False, model, "Validation request failed due to an unexpected upstream error."
@@ -76,12 +95,12 @@ class GeminiService:
     @classmethod
     async def analyze_resume(
         cls,
-        api_key: str,
         resume_text: str,
         target_role: str,
+        api_key: Optional[str] = None,
         model_name: Optional[str] = None,
     ) -> AnalysisResult:
-        """Executes a structured resume analysis against Google Gemini using the caller's key."""
+        """Executes a structured resume analysis against Google Gemini using the server key."""
         model = cls.resolve_model(model_name)
 
         # Sanitize target role
@@ -95,7 +114,7 @@ class GeminiService:
                 },
             )
 
-        client = genai.Client(api_key=api_key)
+        client = cls.get_client(api_key)
 
         prompt = f"""You are an elite executive recruiter and Applicant Tracking System (ATS) expert.
 Evaluate the candidate's resume strictly and specifically for the target role: "{clean_target_role}".
@@ -135,13 +154,13 @@ CRITICAL SECURITY AND EVALUATION DIRECTIVES:
                 code = getattr(e, "code", 500)
                 logger.warning("Gemini API error during analysis attempt %d/%d (code=%s)", attempt, max_retries, code)
 
-                # Never retry client-side authentication or bad request errors
+                # Never retry upstream authentication or client bad request errors
                 if code in (400, 401, 403):
                     raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                         detail={
-                            "error": "INVALID_GEMINI_KEY",
-                            "message": "The provided Gemini API key was rejected by Google Gemini as invalid or unauthorized.",
+                            "error": "AI_UPSTREAM_AUTH_ERROR",
+                            "message": "The AI service encountered an upstream authentication failure. Please contact the administrator.",
                         },
                     )
 
@@ -156,7 +175,7 @@ CRITICAL SECURITY AND EVALUATION DIRECTIVES:
                         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                         detail={
                             "error": "GEMINI_RATE_LIMIT",
-                            "message": "Google Gemini API rate limit or quota exceeded. Please check your Gemini quota or try again in a few moments.",
+                            "message": "Google Gemini API rate limit or quota exceeded. Please try again in a few moments.",
                         },
                     )
 

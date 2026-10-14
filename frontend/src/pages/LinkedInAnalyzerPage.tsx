@@ -4,7 +4,6 @@ import {
   Globe,
   FileText,
   Type,
-  KeyRound,
   ShieldCheck,
   Sparkles,
   ArrowRight,
@@ -15,7 +14,6 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
-  ExternalLink,
   Search,
 } from 'lucide-react';
 import { linkedinService } from '@/services/linkedinService';
@@ -42,11 +40,10 @@ export const LinkedInAnalyzerPage: React.FC = () => {
   const [targetRole, setTargetRole] = useState('AI Developer');
   const [customRoleInput, setCustomRoleInput] = useState('');
   const [isCustomRole, setIsCustomRole] = useState(false);
-  // Memory-only API key state (strictly never stored in localStorage/sessionStorage)
-  const [apiKey, setApiKey] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  // Server-managed AI Model state
+  const [selectedModel, setSelectedModel] = useState('gemini-4-argon');
   const [availableModels, setAvailableModels] = useState<string[]>([
+    'gemini-4-argon',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
     'gemini-1.5-flash',
@@ -148,14 +145,13 @@ export const LinkedInAnalyzerPage: React.FC = () => {
   };
 
   const handleKeyProbe = async () => {
-    if (!apiKey.trim()) return;
     setIsValidatingKey(true);
     setKeyValidationStatus(null);
     try {
-      const res = await linkedinService.validateKey(apiKey.trim(), selectedModel);
+      const res = await linkedinService.validateKey(selectedModel);
       setKeyValidationStatus({ valid: res.valid, message: res.message });
     } catch (err: unknown) {
-      let msg = 'Key validation failed.';
+      let msg = 'Connection probe failed.';
       if (axios.isAxiosError(err)) {
         msg = err.response?.data?.message || err.message || msg;
       } else if (err instanceof Error) {
@@ -218,10 +214,6 @@ export const LinkedInAnalyzerPage: React.FC = () => {
       setErrorMessage('Please specify a target career role.');
       return;
     }
-    if (!apiKey.trim()) {
-      setErrorMessage('Please enter your Google Gemini API key (BYOK) to proceed.');
-      return;
-    }
 
     setErrorMessage(null);
     setUnavailableData(null);
@@ -241,17 +233,14 @@ export const LinkedInAnalyzerPage: React.FC = () => {
           setIsLoading(false);
           return;
         }
-        result = await linkedinService.analyzeUrl(
-          {
-            linkedin_url: val.normalizedUrl || urlInput.trim(),
-            url: val.normalizedUrl || urlInput.trim(),
-            target_role: effectiveRole,
-            model: selectedModel,
-            profile_text: fallbackUrlText.trim() || undefined,
-            fallback_text: fallbackUrlText.trim() || undefined,
-          },
-          apiKey.trim()
-        );
+        result = await linkedinService.analyzeUrl({
+          linkedin_url: val.normalizedUrl || urlInput.trim(),
+          url: val.normalizedUrl || urlInput.trim(),
+          target_role: effectiveRole,
+          model: selectedModel,
+          profile_text: fallbackUrlText.trim() || undefined,
+          fallback_text: fallbackUrlText.trim() || undefined,
+        });
       } else if (activeTab === 'pdf') {
         if (!selectedFile) {
           setErrorMessage('Please upload a LinkedIn-generated PDF export.');
@@ -261,7 +250,6 @@ export const LinkedInAnalyzerPage: React.FC = () => {
         result = await linkedinService.analyzePdf(
           selectedFile,
           effectiveRole,
-          apiKey.trim(),
           selectedModel,
           urlInput.trim() || undefined
         );
@@ -271,15 +259,12 @@ export const LinkedInAnalyzerPage: React.FC = () => {
           setIsLoading(false);
           return;
         }
-        result = await linkedinService.analyzeText(
-          {
-            profile_text: textInput.trim(),
-            target_role: effectiveRole,
-            model: selectedModel,
-            profile_url: urlInput.trim() || undefined,
-          },
-          apiKey.trim()
-        );
+        result = await linkedinService.analyzeText({
+          profile_text: textInput.trim(),
+          target_role: effectiveRole,
+          model: selectedModel,
+          profile_url: urlInput.trim() || undefined,
+        });
       }
 
       setAnalysisResult(result);
@@ -643,46 +628,25 @@ export const LinkedInAnalyzerPage: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                      Gemini API Key (BYOK)
+                      Server-Side AI Engine
                     </label>
-                    <a
-                      href="https://aistudio.google.com/app/apikey"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] text-[#FF7417] hover:underline flex items-center gap-1"
-                    >
-                      Get free key <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                      <KeyRound className="w-4 h-4" />
-                    </div>
-                    <input
-                      type={showApiKey ? 'text' : 'password'}
-                      value={apiKey}
-                      onChange={(e) => {
-                        setApiKey(e.target.value);
-                        setKeyValidationStatus(null);
-                      }}
-                      placeholder="Paste AIzaSy... key"
-                      className="w-full pl-10 pr-20 py-2.5 rounded-xl bg-[#0B0B0E] border border-[#282834] text-xs text-white focus:outline-none focus:border-[#FF7417] font-mono"
-                    />
                     <button
                       type="button"
-                      onClick={() => setShowApiKey(!showApiKey)}
-                      className="absolute inset-y-0 right-12 pr-2 flex items-center text-slate-500 hover:text-slate-300 text-[11px] font-semibold"
-                    >
-                      {showApiKey ? 'Hide' : 'Show'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!apiKey.trim() || isValidatingKey}
+                      disabled={isValidatingKey}
                       onClick={handleKeyProbe}
-                      className="absolute inset-y-1.5 right-1.5 px-2.5 py-1 rounded-lg bg-[#282834] hover:bg-[#3A3A4A] text-slate-200 text-[10px] font-bold disabled:opacity-50"
+                      className="text-[11px] text-[#FF7417] hover:underline flex items-center gap-1 font-semibold"
                     >
-                      {isValidatingKey ? 'Testing...' : 'Test'}
+                      {isValidatingKey ? 'Testing AI connection...' : 'Test AI Connection'}
                     </button>
+                  </div>
+                  <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#0B0B0E] border border-[#282834]">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs font-semibold text-white">Centralized AI Service Active</span>
+                    </div>
+                    <span className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-mono font-medium">
+                      Managed Server-Side
+                    </span>
                   </div>
 
                   {keyValidationStatus && (
@@ -712,12 +676,12 @@ export const LinkedInAnalyzerPage: React.FC = () => {
                   >
                     {availableModels.map((m) => (
                       <option key={m} value={m}>
-                        {m} {m === 'gemini-2.5-flash' ? '(Recommended - Fast & GA)' : ''}
+                        {m} {m === 'gemini-4-argon' ? '(Default Server Frontier Model)' : ''}
                       </option>
                     ))}
                   </select>
                   <p className="mt-1.5 text-[11px] text-slate-500">
-                    Ephemeral execution: Key is strictly request-scoped and never saved.
+                    Secure server configuration: Zero user keys required. All requests processed securely.
                   </p>
                 </div>
               </div>

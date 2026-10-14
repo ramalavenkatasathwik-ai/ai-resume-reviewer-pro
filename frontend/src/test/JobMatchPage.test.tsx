@@ -186,10 +186,6 @@ describe('JobMatchPage Component', () => {
       },
     });
 
-    // Enter API key
-    const apiKeyInput = screen.getByPlaceholderText(/Paste your Google Gemini API key/i);
-    fireEvent.change(apiKeyInput, { target: { value: 'AIzaSyFakeTestKey1234567890' } });
-
     // Click Analyze button
     const analyzeBtn = screen.getByRole('button', { name: /Analyze Match & Fit/i });
     fireEvent.click(analyzeBtn);
@@ -199,8 +195,7 @@ describe('JobMatchPage Component', () => {
         expect.objectContaining({
           resume_id: 'res-123',
           job_description: expect.stringContaining('Senior AI Developer'),
-        }),
-        'AIzaSyFakeTestKey1234567890'
+        })
       );
     });
 
@@ -249,8 +244,6 @@ describe('JobMatchPage Component', () => {
         value: 'Job description long enough to satisfy minimum requirement count of 50 characters here.',
       },
     });
-    const apiKeyInput = screen.getByPlaceholderText(/Paste your Google Gemini API key/i);
-    fireEvent.change(apiKeyInput, { target: { value: 'AIzaSyFakeKey' } });
 
     fireEvent.click(screen.getByRole('button', { name: /Analyze Match & Fit/i }));
 

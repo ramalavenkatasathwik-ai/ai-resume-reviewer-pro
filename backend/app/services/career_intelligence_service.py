@@ -125,11 +125,12 @@ class CareerIntelligenceService:
 
         base_data = copy.deepcopy(version.resume_data)
 
-        # 3. AI Variant Generation if api_key provided
-        if api_key and api_key.strip():
+        # 3. AI Variant Generation if server or request api_key available
+        effective_key = (api_key or settings.GEMINI_API_KEY or "").strip()
+        if effective_key:
             try:
                 model = GeminiService.resolve_model(model_name)
-                client = genai.Client(api_key=api_key.strip())
+                client = GeminiService.get_client(effective_key)
 
                 prompt = f"""You are a master executive resume strategist.
 Tailor the candidate's existing resume strictly for the target role: "{target_role}".
@@ -427,10 +428,11 @@ Respond with a JSON object with:
             context_text = f"Sample {clean_section.replace('_', ' ')} targeting {target_role} position."
 
         # AI Generation
-        if api_key and api_key.strip():
+        effective_key = (api_key or settings.GEMINI_API_KEY or "").strip()
+        if effective_key:
             try:
                 model = GeminiService.resolve_model(model_name)
-                client = genai.Client(api_key=api_key.strip())
+                client = GeminiService.get_client(effective_key)
 
                 prompt = f"""You are an elite executive career coach and professional resume editor.
 Provide 3 high-impact, refined writing suggestions for the section: "{clean_section}" tailored to the target role: "{target_role}".
@@ -638,10 +640,11 @@ STRICT RULES:
                     resume_data = v.resume_data
 
         # AI Generation
-        if api_key and api_key.strip():
+        effective_key = (api_key or settings.GEMINI_API_KEY or "").strip()
+        if effective_key:
             try:
                 model = GeminiService.resolve_model(model_name)
-                client = genai.Client(api_key=api_key.strip())
+                client = GeminiService.get_client(effective_key)
 
                 prompt = f"""You are a seasoned Principal Engineer and Tech Talent Director.
 Create a comprehensive, structured Career Progression Roadmap for a candidate targeting the role: "{target_role}".
@@ -1030,10 +1033,11 @@ Respond strictly in valid JSON matching this schema:
     ) -> ProjectRecommendResponse:
         """Recommends actionable, real-world portfolio projects to demonstrate required competencies."""
         # AI Generation
-        if api_key and api_key.strip():
+        effective_key = (api_key or settings.GEMINI_API_KEY or "").strip()
+        if effective_key:
             try:
                 model = GeminiService.resolve_model(model_name)
-                client = genai.Client(api_key=api_key.strip())
+                client = GeminiService.get_client(effective_key)
 
                 prompt = f"""You are a Principal Software Architect and hiring manager.
 Recommend 3 distinct, production-grade portfolio projects for a candidate targeting: "{target_role}".

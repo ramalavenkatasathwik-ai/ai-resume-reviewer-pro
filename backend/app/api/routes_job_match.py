@@ -42,8 +42,8 @@ async def extract_job_requirements(
     api_key: str = Depends(get_gemini_api_key),
 ) -> JobRequirements:
     return await JobMatchService.extract_requirements(
-        api_key=api_key,
         job_description=payload.job_description,
+        api_key=api_key,
         job_title=payload.job_title,
         company_name=payload.company_name,
         model_name=payload.model,
@@ -108,8 +108,8 @@ async def analyze_job_match(
     # 3. Extract requirements from job description
     effective_title = payload.job_title or payload.target_role or resume.target_role or "AI Developer"
     requirements = await JobMatchService.extract_requirements(
-        api_key=api_key,
         job_description=payload.job_description,
+        api_key=api_key,
         job_title=effective_title,
         company_name=payload.company_name,
         model_name=payload.model,
@@ -117,18 +117,18 @@ async def analyze_job_match(
 
     # 4. Compare resume version against requirements
     comparison = await JobMatchService.compare_resume_to_job(
-        api_key=api_key,
         requirements=requirements,
         resume_version=version,
+        api_key=api_key,
         model_name=payload.model,
     )
 
     # 5. Generate actionable recommendations
     recommendations = await JobMatchService.generate_recommendations(
-        api_key=api_key,
         requirements=requirements,
         comparison=comparison,
         resume_version=version,
+        api_key=api_key,
         model_name=payload.model,
     )
 

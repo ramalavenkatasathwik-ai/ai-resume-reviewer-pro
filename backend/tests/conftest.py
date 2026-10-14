@@ -1,5 +1,13 @@
 import io
+import os
 from typing import AsyncGenerator, Generator
+
+# Configure test environment variables before importing app
+os.environ["APP_ENV"] = "test"
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["SECRET_KEY"] = "ci-test-secret-key-for-automated-runs-64-character-string-long"
+os.environ.setdefault("GEMINI_API_KEY", "AIzaSyD-MockGeminiKeyForUnitTesting_9876543210")
+
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient

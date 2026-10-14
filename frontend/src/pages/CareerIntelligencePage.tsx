@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   FileText,
 } from 'lucide-react';
-import { ApiKeyInput } from '@/components/ui/ApiKeyInput';
 import { resumeDocumentService } from '@/services/resumeDocumentService';
 import { ResumeSummary } from '@/types/resume';
 import {
@@ -45,7 +44,6 @@ const PRESET_ROLES = [
 
 export const CareerIntelligencePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<CareerTab>('variants');
-  const [apiKey, setApiKey] = useState<string>('');
 
   // Resume library
   const [resumes, setResumes] = useState<ResumeSummary[]>([]);
@@ -132,14 +130,11 @@ export const CareerIntelligencePage: React.FC = () => {
     setIsGeneratingVariant(true);
     setVariantSaveSuccess(null);
     try {
-      const draft = await careerIntelligenceService.generateRoleVariant(
-        {
-          resume_id: selectedResumeId,
-          target_role: effectiveRole,
-          job_description: variantJobDescription.trim() || undefined,
-        },
-        apiKey
-      );
+      const draft = await careerIntelligenceService.generateRoleVariant({
+        resume_id: selectedResumeId,
+        target_role: effectiveRole,
+        job_description: variantJobDescription.trim() || undefined,
+      });
       setVariantDraft(draft);
 
       // Automatically prepare diff against base
@@ -188,15 +183,12 @@ export const CareerIntelligencePage: React.FC = () => {
   const handleGenerateRoadmap = async () => {
     setIsGeneratingRoadmap(true);
     try {
-      const data = await careerIntelligenceService.generateRoadmap(
-        {
-          resume_id: selectedResumeId || undefined,
-          target_role: roadmapRole,
-          current_level: currentLevel,
-          target_level: targetLevel,
-        },
-        apiKey
-      );
+      const data = await careerIntelligenceService.generateRoadmap({
+        resume_id: selectedResumeId || undefined,
+        target_role: roadmapRole,
+        current_level: currentLevel,
+        target_level: targetLevel,
+      });
       setCurrentRoadmap(data);
     } catch {
       // error handled
@@ -242,14 +234,11 @@ export const CareerIntelligencePage: React.FC = () => {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-      const res = await careerIntelligenceService.recommendProjects(
-        {
-          target_role: projectRole,
-          resume_id: selectedResumeId || undefined,
-          skill_gaps: gaps.length > 0 ? gaps : undefined,
-        },
-        apiKey
-      );
+      const res = await careerIntelligenceService.recommendProjects({
+        target_role: projectRole,
+        resume_id: selectedResumeId || undefined,
+        skill_gaps: gaps.length > 0 ? gaps : undefined,
+      });
       setRecommendedProjects(res.projects);
     } catch {
       // error handled
@@ -278,9 +267,10 @@ export const CareerIntelligencePage: React.FC = () => {
           </p>
         </div>
 
-        {/* Gemini BYOK Key Input */}
-        <div className="w-full lg:w-96">
-          <ApiKeyInput value={apiKey} onChange={setApiKey} />
+        {/* Server AI Engine Status Pill */}
+        <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#141419] border border-white/10 text-xs text-[#A1A1AA]">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>AI Engine: <strong className="text-white font-mono">gemini-4-argon</strong></span>
         </div>
       </div>
 
@@ -620,7 +610,6 @@ export const CareerIntelligencePage: React.FC = () => {
         <WritingAssistantPanel
           initialResumeId={selectedResumeId}
           initialRole={effectiveRole}
-          geminiApiKey={apiKey}
         />
       )}
 
